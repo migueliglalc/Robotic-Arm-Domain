@@ -1,0 +1,31 @@
+non-fluents nf_can_storage_inst_mdp__1 {
+	domain = can_storage;
+	objects {
+        shelf : {s1};
+		can : {c0, c1, c2};
+	};
+	
+}
+
+instance can_storage_inst_mdp__1 {
+	domain = can_storage;
+	non-fluents = nf_can_storage_inst_mdp__1;
+	init-state {
+		y_position_a = -5;
+		on-shelf(c0,s1);
+		on-shelf(c1,s1);
+		on-shelf(c2,s1);
+		working-shelf(s1);
+		x_position_c(c0)=2;
+		y_position_c(c0)=2;
+		x_position_c(c1)=4;
+		y_position_c(c1)=7;
+		x_position_c(c2)=6;
+		y_position_c(c2)=2;
+
+	};
+
+	max-nondef-actions = 1;
+	horizon  = 9;
+	discount = 1.0;
+}
