@@ -33,6 +33,24 @@ class RandomAgent(BaseAgent):
                 #     action[sample] = s[sample]
         return action
 
+class AdhocAgent(BaseAgent):
+    def __init__(self, action_space, num_actions=1):
+        self.action_space = action_space
+        self.num_actions = num_actions
+
+    def sample_action(self, state=None):
+        actions = []
+        actions.append({'extend-to-shelf': 1.0})
+        actions.append({'right-shift': 1.5})
+        actions.append({'extend-arm': 1.5})
+        actions.append({'pick-up_c0_s1': 1.0})
+        actions.append({'left-shift': 3.5})
+        actions.append({'right-shift': 1.5})
+        actions.append({'extend-arm': 2.5})
+        actions.append({'right-shift': 2.0})
+        actions.append({'extend-arm': 1.2})
+        
+        return actions[state]
 
 class NoOpAgent(BaseAgent):
     def __init__(self, action_space, num_actions=0):
