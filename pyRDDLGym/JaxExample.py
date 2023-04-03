@@ -59,6 +59,8 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
+            myEnv.render()
+
             subs = myEnv.sampler.subs
             key, subkey = jax.random.split(key)
             action = planner.get_action(subkey, params, step, subs)
@@ -93,6 +95,7 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
         state = myEnv.reset() 
         starttime = time.time()
         for step in range(myEnv.horizon):
+            #myEnv.render()
             currtime = time.time()
             elapsed = currtime - starttime
             
@@ -138,7 +141,8 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         
 if __name__ == "__main__":
     if len(sys.argv) < 6:
-        env, trials, timeout, timeout_ps, save = 'Wildfire replan', 1, 60 * 2, 1, False
+        TF_CPP_MIN_LOG_LEVEL = 0
+        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 2, 1, True
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)
@@ -146,5 +150,5 @@ if __name__ == "__main__":
         timeout_ps = int(timeout_ps)
         save = save == 'True' or save == True
     replan = env.endswith('replan')
-    main(env, replan, trials, timeout, timeout_ps, save) 
+    main(env, replan, trials, timeout, timeout_ps, save)
     

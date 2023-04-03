@@ -43,7 +43,7 @@ class AdhocAgent(BaseAgent):
         actions.append({'extend-to-shelf': 1.0})
         actions.append({'right-shift': 1.5})
         actions.append({'extend-arm': 1.5})
-        actions.append({'pick-up_c0_s1': 1.0})
+        actions.append({'pick-up___c0__s1': 1.0})
         actions.append({'left-shift': 3.5})
         actions.append({'right-shift': 1.5})
         actions.append({'extend-arm': 2.5})

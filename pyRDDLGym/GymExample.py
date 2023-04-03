@@ -3,6 +3,8 @@ import sys
 from pyRDDLGym import RDDLEnv
 from pyRDDLGym import ExampleManager
 from pyRDDLGym.Policies.Agents import RandomAgent
+import Examples.Arm.animation as animation
+from pyRDDLGym.Policies.Agents import AdhocAgent
 # from pyRDDLGym.Visualizer.MovieGenerator import MovieGenerator
 
 def main(env, inst, method_name=None, episodes=1):
@@ -30,12 +32,21 @@ def main(env, inst, method_name=None, episodes=1):
     agent = RandomAgent(action_space=myEnv.action_space, 
                         num_actions=myEnv.numConcurrentActions)
 
+    agent = AdhocAgent(action_space=myEnv.action_space,
+                        num_actions=myEnv.numConcurrentActions)
+
+    can_sizes = [(1, 1), (1, 1), (1, 1)]
+    shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
+
     for episode in range(episodes):
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
+
+            animation.parse_state(state, step, can_sizes, shelf_sizes)
+
             myEnv.render()
-            action = agent.sample_action()
+            action = agent.sample_action(step)
             next_state, reward, done, info = myEnv.step(action)
             total_reward += reward
             print()
@@ -46,6 +57,8 @@ def main(env, inst, method_name=None, episodes=1):
             print(f'reward     = {reward}')
             state = next_state
             if done:
+                animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
+                animation.create_video()
                 break
         print(f'episode {episode} ended with reward {total_reward}')
     
@@ -57,7 +70,7 @@ if __name__ == "__main__":
     method_name = None
     episodes = 1
     if len(args) < 3:
-        env, inst = 'HVAC', '0'
+        env, inst = 'Arm', '0'
     elif len(args) < 4:
         env, inst = args[1:3]
     elif len(args) < 5:

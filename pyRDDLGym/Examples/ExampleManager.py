@@ -22,6 +22,7 @@ def rebuild():
         
         # walk through current folder to find valid domains
         for dirpath, _, filenames in os.walk(path):
+            print(filenames)
             if 'domain.info' in filenames:
                 infopath = os.path.join(dirpath, 'domain.info')
                 config = configparser.RawConfigParser()
@@ -43,6 +44,7 @@ def load():
     path = os.path.dirname(os.path.abspath(__file__))
     # path_to_manifest = os.path.join(path, '../Domains/manifest.csv')
     path_to_manifest = os.path.join(path, 'manifest.csv')
+    print("Path: ", path_to_manifest)
     if not os.path.isfile(path_to_manifest):
         return {}
         

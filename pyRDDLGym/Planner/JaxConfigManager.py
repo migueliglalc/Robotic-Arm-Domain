@@ -44,7 +44,7 @@ def get(path: str) -> Dict[str, object]:
     env_args['instance'] = EnvInfo.get_instance(inst_name)
         
     myEnv = RDDLEnv(**env_args)
-    # myEnv.set_visualizer(EnvInfo.get_visualizer())
+    myEnv.set_visualizer(EnvInfo.get_visualizer())
     
     # read the model settings
     model_args = {k: args[k] for (k, v) in config.items('Model')}
