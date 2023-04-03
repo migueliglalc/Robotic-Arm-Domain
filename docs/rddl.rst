@@ -174,6 +174,7 @@ This argument can be one of the following four options:
 * ``int``: integer valued variable (i.e., 1, 2, 3, 10, 100 ...)
 * ``real``: real valued variable (i.e., 0.1, 0.25, 1.414, 2.718, 3.142 ...)
 * ``<enumerable>``: an enumerated value defined by the user in the ``types`` section
+* ``<object>``: an object type defined in the ``types`` section whose objects are specified in the instance (this is a new feature of pyRDDLGym)
 
 The last argument sets a default value to the declared variable. 
 If the variable is a non-fluent or state-fluent and is not specified to have a 
@@ -322,6 +323,24 @@ The termination block has the following syntax:
 where ``<terminal_condition#>`` are boolean formulas.
 The termination decision is a disjunction of all the conditions in the block 
 (termination if at least one is True).
+
+Valid Dependencies
+^^^^^^^^^^^^^^^^^^^
+
+Fluent variables in RDDL have a strict dependency structure, as outlined in the schematic below:
+
+.. image:: rddlgraph.png
+    :width: 600
+    :alt: Dependencies between fluents in RDDL documents
+ 
+In summary:
+
+* a ``non-fluent`` can be used in any expression
+* state invariants and termination block are checked in each state, so they are expressed using unprimed state variables
+* action preconditions are checked for each state-action pair, so they are also expressed using unprimed state variables
+* ``derived-fluent`` is deprecated and should be replaced by ``interm-fluent``
+* primed ``state-fluent`` and ``interm-fluent`` can depend on other primed ``state-fluent`` and ``interm-fluent``, unless `allow_synchronous_state = False`
+* cyclic dependencies (e.g. a fluent expression depends on the value of that fluent) are not allowed.
 
 Non-fluents Block
 ^^^^^^^^^^^^^^^^^^^
@@ -676,7 +695,7 @@ RDDL currently supports the following discrete (int, bool or enumerated values) 
      - Samples a boolean value with probability of true given by parameter ``p``; must have ``0 <= p <= 1``
      - Yes
    * - ``Discrete(<var_name>, p)``
-     - Samples an enumerated value with probability vector ``p``; elements of ``p`` must be non-negative and sum to 1; the syntax of ``p`` is described after this table
+     - Samples an enumerated value with probability vector ``p``; elements of ``p`` must be non-negative and sum to 1
    	 - Yes
    * - ``UnnormDiscrete(<var_name>, p)``
      - Same as ``Discrete``, except ``p`` needs to be only non-negative   
