@@ -65,3 +65,4 @@ def parse_state(state, index,  can_sizes, shelf_sizes):
 
     # Show plot
     plt.savefig(f'Examples/Arm/States/state_{index}.png')
+    plt.show()

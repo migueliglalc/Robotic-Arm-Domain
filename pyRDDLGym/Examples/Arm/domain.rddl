@@ -224,7 +224,7 @@ domain can_storage {
                     else
                       if (
                           [exists_{?s:shelf}(
-                            working-shelf(?s)^~safe-position^
+                            working-shelf(?s)^
                             ( (x_position_a - left-shift)<MIN_X(?s) 
                             | (x_position_a + SIZE_X_a + right-shift)>MAX_X(?s) )
                             |
@@ -250,14 +250,21 @@ domain can_storage {
                     else if ([exists_{?s:shelf}(~safe-position^working-shelf(?s)^
                             (y_position_a + extend-arm)>MAX_Y(?s))]) //check limit when not holding can
                               then y_position_a
-                    else
-                      y_position_a + extend-arm - retract-arm;
+                    else if (safe-position) then y_position_a
+                    else y_position_a + extend-arm - retract-arm;
 
     x_position_c'(?c) = if(holding'(?c)^~(x_position_a==x_position_a')) then x_position_c(?c) + right-shift - left-shift else x_position_c(?c);
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
     };
 
-  reward = if([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]) then 1.0
+  reward = if([exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])]) then 1.0
             else 0.0;
+
+  termination{
+      if([exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])]) then true
+           else false;
+
+  };
   }
+
 

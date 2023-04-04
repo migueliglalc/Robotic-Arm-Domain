@@ -1,0 +1,46 @@
+
+
+domain basic_arm {
+
+
+  pvariables {
+
+    x_position_a               : { state-fluent, int, default = 0 };
+    y_position_a               : { state-fluent, int, default = 0 }; //assume is the left most coordinate
+    x_position_c               : { non-fluent, int, default = 9 };
+    y_position_c               : { non-fluent, int, default = 9 };   
+
+
+  // Actions 
+    extend-arm                 : { action-fluent, int, default = 0 }; //
+    retract-arm                : { action-fluent, int, default = 0 };
+    right-shift                : { action-fluent, int, default = 0 };
+    left-shift	               : { action-fluent, int, default = 0 };
+  };
+
+  cpfs {
+
+    x_position_a' = if((x_position_a + 1 + right-shift)>10) then x_position_a
+                    else if ((x_position_a - left-shift)<0) then x_position_a
+                    else x_position_a + right-shift - left-shift;
+
+
+    y_position_a' = if((y_position_a + 1 + extend-arm)>10) then y_position_a
+                    else if ((y_position_a - retract-arm)<0) then y_position_a
+                    else y_position_a + extend-arm - retract-arm;
+                    
+    };
+
+  reward = if((x_position_a == x_position_c)^(y_position_a==y_position_c)) then 10.0
+           else if ((x_position_a' == x_position_a)^(y_position_a'==y_position_a)) then -10
+           else if ((x_position_a' < x_position_a)|(y_position_a'<y_position_a)) then -10
+           else 10.0/((x_position_c - x_position_a)+(y_position_c - y_position_a)+1);
+
+  termination{
+      if((x_position_a == x_position_c)^(y_position_a==y_position_c)) then true
+            else false;
+
+  };
+  }
+
+

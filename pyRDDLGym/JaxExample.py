@@ -5,6 +5,7 @@ import time
 
 from pyRDDLGym.Planner import JaxConfigManager
 from pyRDDLGym.Core.Compiler.RDDLDecompiler import RDDLDecompiler
+import Examples.Arm.animation as animation
 # from pyRDDLGym.Core.Jax.JaxRDDLModelError import JaxRDDLModelError
 
 
@@ -47,6 +48,10 @@ def slp_train(planner, budget, **train_args):
 
 
 def slp_no_replan(env, trials, timeout, timeout_ps, save):
+
+    can_sizes = [(1, 1), (1, 1), (1, 1)]
+    shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
+
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']    
     
@@ -64,9 +69,13 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
             subs = myEnv.sampler.subs
             key, subkey = jax.random.split(key)
             action = planner.get_action(subkey, params, step, subs)
+            print(action)
+            action={list(action.keys())[0]:action[list(action.keys())[0]]}
             next_state, reward, done, _ = myEnv.step(action)
             total_reward += reward 
             rewards[step, trial] = reward
+
+            #animation.parse_state(state, step, can_sizes, shelf_sizes)
             
             print()
             print('step       = {}'.format(step))
@@ -76,6 +85,8 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
             print('reward     = {}'.format(reward))
             state = next_state
             if done:
+                #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
+                #animation.create_video()
                 break
         print(f'episode ended with reward {total_reward}')
         
@@ -144,7 +155,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 2, 1, True
+        env, trials, timeout, timeout_ps, save = 'BasicArm', 1, 60 * 100, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)
