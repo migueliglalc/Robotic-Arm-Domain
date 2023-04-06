@@ -43,7 +43,7 @@ def main(env, inst, method_name=None, episodes=1):
         state = myEnv.reset()
         for step in range(myEnv.horizon):
 
-            animation.parse_state(state, step, can_sizes, shelf_sizes)
+            #animation.parse_state(state, step, can_sizes, shelf_sizes)
 
             myEnv.render()
             action = agent.sample_action(step)
@@ -57,8 +57,8 @@ def main(env, inst, method_name=None, episodes=1):
             print(f'reward     = {reward}')
             state = next_state
             if done:
-                animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
-                animation.create_video()
+                #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
+                #animation.create_video()
                 break
         print(f'episode {episode} ended with reward {total_reward}')
     
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     method_name = None
     episodes = 1
     if len(args) < 3:
-        env, inst = 'Arm', '0'
+        env, inst = 'BasicArm', '0'
     elif len(args) < 4:
         env, inst = args[1:3]
     elif len(args) < 5:

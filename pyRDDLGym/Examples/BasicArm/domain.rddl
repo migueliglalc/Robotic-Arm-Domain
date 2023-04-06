@@ -7,8 +7,8 @@ domain basic_arm {
 
     x_position_a               : { state-fluent, int, default = 0 };
     y_position_a               : { state-fluent, int, default = 0 }; //assume is the left most coordinate
-    x_position_c               : { non-fluent, int, default = 9 };
-    y_position_c               : { non-fluent, int, default = 9 };   
+    x_position_c               : { non-fluent, int, default = 10 };
+    y_position_c               : { non-fluent, int, default = 10 };   
 
 
   // Actions 
@@ -20,21 +20,22 @@ domain basic_arm {
 
   cpfs {
 
-    x_position_a' = if((x_position_a + 1 + right-shift)>10) then x_position_a
-                    else if ((x_position_a - left-shift)<0) then x_position_a
+    x_position_a' = if((x_position_a + right-shift)>10.0) then x_position_a
+                    else if ((x_position_a - left-shift)<0.0) then x_position_a
                     else x_position_a + right-shift - left-shift;
 
 
-    y_position_a' = if((y_position_a + 1 + extend-arm)>10) then y_position_a
-                    else if ((y_position_a - retract-arm)<0) then y_position_a
+    y_position_a' = if((y_position_a + extend-arm)>10.0) then y_position_a
+                    else if ((y_position_a - retract-arm)<0.0) then y_position_a
                     else y_position_a + extend-arm - retract-arm;
                     
     };
 
-  reward = if((x_position_a == x_position_c)^(y_position_a==y_position_c)) then 10.0
-           else if ((x_position_a' == x_position_a)^(y_position_a'==y_position_a)) then -10
-           else if ((x_position_a' < x_position_a)|(y_position_a'<y_position_a)) then -10
-           else 10.0/((x_position_c - x_position_a)+(y_position_c - y_position_a)+1);
+  reward = 100*((x_position_a' == x_position_c)^(y_position_a'==y_position_c)) + 10.0/((x_position_c - x_position_a')+(y_position_c - y_position_a')+1);
+           //else if ((x_position_a' == x_position_a)^(y_position_a'== y_position_a)) then -10.0
+           //else if ((x_position_a' < x_position_a)|(y_position_a'<y_position_a)) then -10.0
+           //else 10.0/((x_position_c - x_position_a')+(y_position_c - y_position_a')+1);
+           //else -10.0;
 
   termination{
       if((x_position_a == x_position_c)^(y_position_a==y_position_c)) then true

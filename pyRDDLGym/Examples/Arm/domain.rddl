@@ -257,8 +257,7 @@ domain can_storage {
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
     };
 
-  reward = if([exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])]) then 1.0
-            else 0.0;
+  reward = 100*([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]);
 
   termination{
       if([exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])]) then true

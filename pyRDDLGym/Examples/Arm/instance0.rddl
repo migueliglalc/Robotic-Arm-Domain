@@ -22,7 +22,7 @@ instance can_storage_inst_mdp__1 {
 
 	};
 
-	max-nondef-actions = 1;
-	horizon  = 100;
-	discount = 1.0;
+	max-nondef-actions = 30;
+	horizon  = 7;
+	discount = 0.9;
 }

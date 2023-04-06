@@ -6,7 +6,7 @@ instance basic_arm_inst_mdp__1 {
 	domain = basic_arm;
 	non-fluents = nf_basic_arm_inst_mdp__1;
 
-	max-nondef-actions = 1;
-	horizon  = 1000;
-	discount = 0.7;
+	max-nondef-actions = 5;
+	horizon  = 2;
+	discount = 0.9;
 }

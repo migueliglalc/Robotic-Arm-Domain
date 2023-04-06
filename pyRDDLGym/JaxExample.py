@@ -53,14 +53,16 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
     shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
 
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
-    key = train_args['key']    
-    
+    key = train_args['key']
+    print(key)
+
     rewards = np.zeros((myEnv.horizon, trials))
     for trial in range(trials):
         print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
-        
+        for i in params.keys():
+            print(f'{i} : {params[i]}')
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
@@ -68,9 +70,11 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
 
             subs = myEnv.sampler.subs
             key, subkey = jax.random.split(key)
+
             action = planner.get_action(subkey, params, step, subs)
             print(action)
-            action={list(action.keys())[0]:action[list(action.keys())[0]]}
+            #if len(action) > 1:
+             #   action={list(action.keys())[0]:action[list(action.keys())[0]]}
             next_state, reward, done, _ = myEnv.step(action)
             total_reward += reward 
             rewards[step, trial] = reward
@@ -106,7 +110,7 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
         state = myEnv.reset() 
         starttime = time.time()
         train_args['guess'] = None
-        for step in range(myEnv.horizon):
+        for step in range(10):
             #myEnv.render()
             currtime = time.time()
             elapsed = currtime - starttime
@@ -155,7 +159,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'BasicArm', 1, 60 * 100, 1, False
+        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 100, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)
