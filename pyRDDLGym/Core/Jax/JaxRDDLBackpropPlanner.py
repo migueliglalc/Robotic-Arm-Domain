@@ -182,15 +182,18 @@ class JaxStraightLinePlan(JaxPlan):
     def __init__(self, initializer: initializers.Initializer=initializers.normal(),
                  wrap_sigmoid: bool=True,
                  min_action_prob: float=0.001,
+                 wrap_non_bool: bool=False,
                  use_new_projection: bool=True,
                  max_constraint_iter: int=999) -> None:
         '''Creates a new straight line plan in JAX.
         
         :param initializer: a Jax Initializer for setting the initial actions
-        :param wrap_sigmoid: wrap bool actions with sigmoid 
+        :param wrap_sigmoid: wrap bool action parameters with sigmoid 
         (uses gradient clipping instead of sigmoid if None)
         :param min_action_prob: minimum value a soft boolean action can take
         (maximum is 1 - min_action_prob); required positive if wrap_sigmoid = True
+        :param wrap_non_bool: whether to wrap real or int action fluent parameters
+        with non-linearity (e.g. sigmoid or ELU) to satisfy box constraints
         :param use_new_projection: whether to use non-iterative (e.g. sort-based)
         projection method, or modified SOGBOFA projection method to satisfy
         action concurrency constraint
@@ -202,6 +205,7 @@ class JaxStraightLinePlan(JaxPlan):
         self._initializer = initializer
         self._wrap_sigmoid = wrap_sigmoid
         self._min_action_prob = min_action_prob
+        self._wrap_non_bool = wrap_non_bool
         self._max_constraint_iter = max_constraint_iter
         self._use_new_projection = use_new_projection
         
@@ -214,11 +218,13 @@ class JaxStraightLinePlan(JaxPlan):
         max_action = 1.0 - min_action
         wrap_sigmoid = self._wrap_sigmoid
         bool_threshold = 0.0 if wrap_sigmoid else 0.5
+        wrap_non_bool = self._wrap_non_bool
         max_constraint_iter = self._max_constraint_iter
         
         # calculate the correct action box bounds
         shapes, bounds = {}, {}
-        for (name, prange) in rddl.variable_ranges.items():
+        ranges = rddl.variable_ranges
+        for (name, prange) in ranges.items():
             
             # make sure variable is an action fluent (what we are optimizing)
             if rddl.variable_types[name] != 'action-fluent':
@@ -240,40 +246,62 @@ class JaxStraightLinePlan(JaxPlan):
             if prange == 'bool':
                 bounds[name] = None
             else:
-                bounds[name] = _bounds.get(name, (-jnp.inf, jnp.inf))
+                lower, upper = _bounds.get(name, (-jnp.inf, jnp.inf))
+                if lower is None: 
+                    lower = -jnp.inf
+                if upper is None: 
+                    upper = jnp.inf
+                bounds[name] = (lower, upper)
             warnings.warn(f'Bounds of action fluent <{name}> parameters '
                           f'set to {bounds[name]}', stacklevel=2)
         self.bounds = bounds
         
-        # these define the mapping from action parameter to action and vice versa
-        def _jax_param_to_action(var, param, hyperparams):
+        # define the mapping between trainable parameter and action
+        def _jax_bool_param_to_action(var, param, hyperparams):
             if wrap_sigmoid:
                 weight = hyperparams[var]
                 return jax.nn.sigmoid(weight * param)
             else:
                 return param 
         
-        def _jax_action_to_param(var, action, hyperparams):
+        def _jax_bool_action_to_param(var, action, hyperparams):
             if wrap_sigmoid:
                 weight = hyperparams[var]
                 return (-1.0 / weight) * jnp.log(1.0 / action - 1.0)
             else:
                 return action
-                    
-        # clip actions to valid box constraints
-        def _jax_wrapped_projection_bounds(var, hyperparams):
-            if rddl.variable_ranges[var] == 'bool':
-                lower = _jax_action_to_param(var, min_action, hyperparams)
-                upper = _jax_action_to_param(var, max_action, hyperparams)
-                return lower, upper
-            else:
-                return bounds[var]
             
+        def _jax_non_bool_param_to_action(var, param, hyperparams):
+            if wrap_non_bool:
+                lower, upper = bounds[var]
+                if lower > -jnp.inf and upper < jnp.inf:
+                    action = lower + (upper - lower) * jax.nn.sigmoid(param)
+                elif lower > -jnp.inf:
+                    action = lower + jax.nn.elu(param, alpha=1.0) + 1.0
+                elif upper < jnp.inf:
+                    action = upper - (jax.nn.elu(-param, alpha=1.0) + 1.0)
+                else:
+                    action = param
+            else:
+                action = param
+            return action
+        
+        # handle box constraints    
+        def _jax_project_bool_to_box(var, param, hyperparams):
+            lower = _jax_bool_action_to_param(var, min_action, hyperparams)
+            upper = _jax_bool_action_to_param(var, max_action, hyperparams)
+            valid_param = jnp.clip(param, lower, upper)
+            return valid_param
+        
         def _jax_wrapped_slp_project_to_box(params, hyperparams):
             new_params = {}
             for (var, param) in params.items():
-                lower, upper = _jax_wrapped_projection_bounds(var, hyperparams)
-                new_params[var] = jnp.clip(param, lower, upper)
+                if ranges[var] == 'bool':
+                    new_params[var] = _jax_project_bool_to_box(var, param, hyperparams)
+                elif wrap_non_bool:
+                    new_params[var] = param
+                else:
+                    new_params[var] = jnp.clip(param, *bounds[var])
             return new_params, True
             
         # initialize the parameters inside their valid ranges
@@ -282,8 +310,8 @@ class JaxStraightLinePlan(JaxPlan):
             for (var, shape) in shapes.items():
                 key, subkey = random.split(key)
                 param = init(subkey, shape, dtype=compiled.REAL)
-                if rddl.variable_ranges[var] == 'bool':
-                    param = param + bool_threshold
+                if ranges[var] == 'bool':
+                    param += bool_threshold
                 params[var] = param
             params, _ = _jax_wrapped_slp_project_to_box(params, hyperparams)
             return params
@@ -296,8 +324,10 @@ class JaxStraightLinePlan(JaxPlan):
             actions = {}
             for (var, param) in params.items():
                 action = jnp.asarray(param[step, ...], dtype=compiled.REAL)
-                if rddl.variable_ranges[var] == 'bool':
-                    action = _jax_param_to_action(var, action, hyperparams)
+                if ranges[var] == 'bool':
+                    action = _jax_bool_param_to_action(var, action, hyperparams)
+                else:
+                    action = _jax_non_bool_param_to_action(var, action, hyperparams)
                 actions[var] = action
             return actions
         
@@ -306,11 +336,13 @@ class JaxStraightLinePlan(JaxPlan):
             actions = {}
             for (var, param) in params.items():
                 action = jnp.asarray(param[step, ...])
-                prange = rddl.variable_ranges[var]
-                if prange == 'int':
-                    action = jnp.round(action).astype(compiled.INT)
-                elif prange == 'bool':
+                prange = ranges[var]
+                if prange == 'bool':
                     action = action > bool_threshold
+                else:
+                    action = _jax_non_bool_param_to_action(var, action, hyperparams)
+                    if prange == 'int':
+                        action = jnp.round(action).astype(compiled.INT)
                 actions[var] = action
             return actions
         
@@ -321,7 +353,7 @@ class JaxStraightLinePlan(JaxPlan):
         allowed_actions = rddl.max_allowed_actions
         bool_action_count = sum(np.size(values)
                                 for (var, values) in rddl.actions.items()
-                                if rddl.variable_ranges[var] == 'bool')
+                                if ranges[var] == 'bool')
         use_sogbofa_clip_trick = allowed_actions < bool_action_count
         
         if use_sogbofa_clip_trick: 
@@ -333,7 +365,7 @@ class JaxStraightLinePlan(JaxPlan):
             noop = {var: (values if isinstance(values, bool) else values)
                     for (var, values) in rddl.actions.items()}
         
-        # use SOGBOFA projection method...
+        # use new projection method...
         if use_sogbofa_clip_trick and self._use_new_projection:
             
             # shift the boolean actions uniformly, clipping at the min/max values
@@ -342,49 +374,49 @@ class JaxStraightLinePlan(JaxPlan):
             def _jax_wrapped_sorting_project(params, hyperparams):
                 
                 # find the amount to shift action parameters
-                params_flat = []
+                # if noop is True pretend it is False and reflect the parameter
+                scores = []
                 for (var, param) in params.items():
-                    if rddl.variable_ranges[var] == 'bool':
-                        param = jnp.ravel(param)
+                    if ranges[var] == 'bool':
+                        param_flat = jnp.ravel(param)
                         if noop[var]:
-                            param = (-param) if wrap_sigmoid else 1.0 - param
-                        params_flat.append(param)
-                params_flat = jnp.concatenate(params_flat)
-                descending = jnp.sort(params_flat)[::-1]
+                            param_flat = (-param_flat) if wrap_sigmoid else 1.0 - param_flat
+                        scores.append(param_flat)
+                scores = jnp.concatenate(scores)
+                descending = jnp.sort(scores)[::-1]
                 kplus1st_greatest = descending[allowed_actions]
                 surplus = jnp.maximum(kplus1st_greatest - bool_threshold, 0.0)
                     
                 # perform the shift
                 new_params = {}
                 for (var, param) in params.items():
-                    if rddl.variable_ranges[var] == 'bool':
+                    if ranges[var] == 'bool':
                         new_param = param + (surplus if noop[var] else -surplus)
-                        lower, upper = _jax_wrapped_projection_bounds(var, hyperparams)
-                        new_param = jnp.clip(new_param, lower, upper)
+                        new_param = _jax_project_bool_to_box(var, new_param, hyperparams)
                     else:
                         new_param = param
                     new_params[var] = new_param
                 return new_params, True
                 
             # clip actions to valid bounds and satisfy constraint on max actions
-            def _jax_wrapped_sorting_project_to_max_constraint(params, hyperparams):
+            def _jax_wrapped_slp_project_to_max_constraint(params, hyperparams):
                 params, _ = _jax_wrapped_slp_project_to_box(params, hyperparams)
                 project_over_horizon = jax.vmap(
                     _jax_wrapped_sorting_project, in_axes=(0, None)
                 )(params, hyperparams)
                 return project_over_horizon
             
-            self.projection = _jax_wrapped_sorting_project_to_max_constraint
+            self.projection = _jax_wrapped_slp_project_to_max_constraint
         
-        # use new (simplified) projection method...
+        # use SOGBOFA projection method...
         elif use_sogbofa_clip_trick and not self._use_new_projection:
             
             # calculate the surplus of actions above max-nondef-actions
             def _jax_wrapped_sogbofa_surplus(params, hyperparams):
                 sum_action, count = 0.0, 0
                 for (var, param) in params.items():
-                    if rddl.variable_ranges[var] == 'bool':
-                        action = _jax_param_to_action(var, param, hyperparams)                        
+                    if ranges[var] == 'bool':
+                        action = _jax_bool_param_to_action(var, param, hyperparams)                        
                         if noop[var]:
                             sum_action += jnp.size(action) - jnp.sum(action)
                             count += jnp.sum(action < 1)
@@ -407,11 +439,11 @@ class JaxStraightLinePlan(JaxPlan):
                 it, params, hyperparams, surplus = values
                 new_params = {}
                 for (var, param) in params.items():
-                    if rddl.variable_ranges[var] == 'bool':
-                        action = _jax_param_to_action(var, param, hyperparams)
+                    if ranges[var] == 'bool':
+                        action = _jax_bool_param_to_action(var, param, hyperparams)
                         new_action = action + (surplus if noop[var] else -surplus)
                         new_action = jnp.clip(new_action, min_action, max_action)
-                        new_param = _jax_action_to_param(var, new_action, hyperparams)                     
+                        new_param = _jax_bool_action_to_param(var, new_action, hyperparams)
                     else:
                         new_param = param
                     new_params[var] = new_param
@@ -431,14 +463,14 @@ class JaxStraightLinePlan(JaxPlan):
                 return params, converged
                 
             # clip actions to valid bounds and satisfy constraint on max actions
-            def _jax_wrapped_sogbofa_project_to_max_constraint(params, hyperparams):
+            def _jax_wrapped_slp_project_to_max_constraint(params, hyperparams):
                 params, _ = _jax_wrapped_slp_project_to_box(params, hyperparams)
                 project_over_horizon = jax.vmap(
                     _jax_wrapped_sogbofa_project, in_axes=(0, None)
                 )(params, hyperparams)
                 return project_over_horizon
             
-            self.projection = _jax_wrapped_sogbofa_project_to_max_constraint
+            self.projection = _jax_wrapped_slp_project_to_max_constraint
         
         # just project to box constraints
         else: 
@@ -571,12 +603,7 @@ class JaxRDDLBackpropPlanner:
             n_batch=self.batch_size_test)
         
         # initialization
-        def _jax_wrapped_init_policy(key, hyperparams, subs):
-            params = self.plan.initializer(key, hyperparams, subs)
-            opt_state = self.optimizer.init(params)
-            return params, opt_state
-        
-        self.initialize = jax.jit(_jax_wrapped_init_policy)
+        self.initialize = jax.jit(self._jax_init())
         
         # losses
         train_loss = self._jax_loss(train_rollouts, use_symlog=self.use_symlog_reward)
@@ -584,9 +611,8 @@ class JaxRDDLBackpropPlanner:
         self.test_loss = jax.jit(self._jax_loss(test_rollouts, use_symlog=False))
         
         # optimization
-        self.update = jax.jit(self._jax_update(
-            train_loss, self.optimizer, self.plan.projection))
-        
+        self.update = jax.jit(self._jax_update(train_loss))
+    
     def _jax_loss(self, rollouts, use_symlog=False):
         gamma = self.rddl.discount
         utility_fn = self.utility
@@ -615,7 +641,20 @@ class JaxRDDLBackpropPlanner:
         
         return _jax_wrapped_plan_loss
     
-    def _jax_update(self, loss, optimizer, projection):
+    def _jax_init(self):
+        init = self.plan.initializer
+        optimizer = self.optimizer
+        
+        def _jax_wrapped_init_policy(key, hyperparams, subs):
+            policy_params = init(key, hyperparams, subs)
+            opt_state = optimizer.init(policy_params)
+            return policy_params, opt_state
+        
+        return _jax_wrapped_init_policy
+        
+    def _jax_update(self, loss):
+        optimizer = self.optimizer
+        projection = self.plan.projection
         
         # calculate the plan gradient w.r.t. return loss and update optimizer
         # also perform a projection step to satisfy constraints on actions
@@ -625,7 +664,7 @@ class JaxRDDLBackpropPlanner:
             grad, log = grad_fn(key, policy_params, hyperparams, subs, model_params)  
             updates, opt_state = optimizer.update(grad, opt_state) 
             policy_params = optax.apply_updates(policy_params, updates)
-            policy_params, converged = projection(policy_params, hyperparams)         
+            policy_params, converged = projection(policy_params, hyperparams)
             log['grad'] = grad
             log['updates'] = updates
             return policy_params, converged, opt_state, log
