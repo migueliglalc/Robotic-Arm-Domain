@@ -441,4 +441,3 @@ instance inst_mountain_car_0 {
 	horizon  = 200;
 	discount = 1.0;
 }
-

@@ -10,8 +10,8 @@ domain basic_arm {
 
     x_position_a               : { state-fluent, int, default = 0 };
     y_position_a               : { state-fluent, int, default = 0 }; //assume is the left most coordinate
-    x_position_c               : { non-fluent, int, default = 10 };
-    y_position_c               : { non-fluent, int, default = 10 };   
+    x_position_c               : { non-fluent, int, default = 3 };
+    y_position_c               : { non-fluent, int, default = 3 };   
 
 
   // Actions 
@@ -34,17 +34,11 @@ domain basic_arm {
                     
     };
 
-  reward = if (x_position_a'==x_position_a ^ y_position_a'==y_position_a) then -100.0
-           else 1/((x_position_c - x_position_a')+(y_position_c - y_position_a')+1);
-           //if (right-shift) then 2.0
-           //else if (extend-arm) then 1.0
-           //else if ((x_position_a == x_position_c)^(y_position_a==y_position_c)) then 10.0
-           //else -1.0;
+  reward = 100*(x_position_a'==x_position_c ^ y_position_a'==y_position_c)-
+           0.1*(extend-arm>0 | retract-arm>0 | right-shift>0 | left-shift>0);
 
   termination{
-      if((x_position_a == x_position_c)^(y_position_a==y_position_c)) then true
-            else false;
-
+      (x_position_a == x_position_c)^(y_position_a==y_position_c);
   };
 
   }

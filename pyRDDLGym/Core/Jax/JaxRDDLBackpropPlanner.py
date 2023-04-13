@@ -329,7 +329,8 @@ class JaxStraightLinePlan(JaxPlan):
                           f'max_nondef_actions: total boolean actions '
                           f'{bool_action_count} > max_nondef_actions '
                           f'{allowed_actions}.', stacklevel=2)
-            noop = {var: (values if isinstance(values, bool) else values[0])
+            print(rddl.actions.items())
+            noop = {var: (values if isinstance(values, bool) else values)
                     for (var, values) in rddl.actions.items()}
         
         # use SOGBOFA projection method...

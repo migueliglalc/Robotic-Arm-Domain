@@ -56,7 +56,7 @@ def parse_state(state, index,  can_sizes, shelf_sizes):
                 if 'holding___c' in can_key:
                     colour = '#DA0016'
                 else:
-                    colour = '#F40009'
+                    colour = '#F40039'
                 axs[i].add_patch(plt.Rectangle((can_x, can_y), can_sizes[int(can_name[-1])][0], can_sizes[int(can_name[-1])][1], color=colour))
 
         # Set axis limits
