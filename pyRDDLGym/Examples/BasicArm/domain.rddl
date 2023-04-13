@@ -8,37 +8,36 @@ domain basic_arm {
 
   pvariables {
 
-    x_position_a               : { state-fluent, int, default = 0 };
-    y_position_a               : { state-fluent, int, default = 0 }; //assume is the left most coordinate
-    x_position_c               : { non-fluent, int, default = 3 };
-    y_position_c               : { non-fluent, int, default = 3 };   
+    x_position_a               : { state-fluent, real, default = 0 };
+    y_position_a               : { state-fluent, real, default = 0 }; //assume is the left most coordinate
+    x_position_c               : { non-fluent, real, default = 10 };
+    y_position_c               : { non-fluent, real, default = 10 };
+
+    MAX_X                      :{non-fluent, real, default = 10};
+    MAX_Y                      :{non-fluent, real, default = 10};
 
 
   // Actions 
-    extend-arm                 : { action-fluent, int, default = 0 }; //
-    retract-arm                : { action-fluent, int, default = 0 };
-    right-shift                : { action-fluent, int, default = 0 };
-    left-shift	               : { action-fluent, int, default = 0 };
+    x_motion                   : { action-fluent, real, default = 0 }; //
+    y_motion                   : { action-fluent, real, default = 0 };
   };
 
   cpfs {
 
-    x_position_a' = if((x_position_a + right-shift)>10.0) then x_position_a
-                    else if ((x_position_a - left-shift)<0.0) then x_position_a
-                    else x_position_a + right-shift - left-shift;
+    x_position_a' = if((x_position_a + x_motion)>MAX_X|(x_position_a+x_motion<0)) then x_position_a
+                    else x_position_a+x_motion;
 
 
-    y_position_a' = if((y_position_a + extend-arm)>10.0) then y_position_a
-                    else if ((y_position_a - retract-arm)<0.0) then y_position_a
-                    else y_position_a + extend-arm - retract-arm;
+    y_position_a' = if((y_position_a + y_motion)>MAX_Y|(y_position_a+y_motion<0)) then y_position_a
+                    else y_position_a+y_motion;
                     
     };
 
-  reward = 100*(x_position_a'==x_position_c ^ y_position_a'==y_position_c)-
-           0.1*(extend-arm>0 | retract-arm>0 | right-shift>0 | left-shift>0);
+  reward = (x_position_a'>=x_position_c ^ y_position_a'>=y_position_c)-
+           0.1*(~(x_motion==0.0) | ~(y_motion==0.0));
 
   termination{
-      (x_position_a == x_position_c)^(y_position_a==y_position_c);
+      (x_position_a >= x_position_c)^(y_position_a>=y_position_c);
   };
 
   }

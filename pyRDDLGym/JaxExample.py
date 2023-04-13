@@ -57,64 +57,80 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
 
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']
-    print(key)
+    #print(key)
 
     rewards = np.zeros((myEnv.horizon, trials))
     for trial in range(trials):
-        print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
+        #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
+        """
         for i in params.keys():
             print(f'{i} : {params[i]}')
+            c = 0
+            for j in params[i]:
+                if j>0:
+                    c+=1
+            print(c/len(params[i]))
+        """
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
-            myEnv.render()
+            #myEnv.render()
 
             subs = myEnv.sampler.subs
             key, subkey = jax.random.split(key)
 
             action = planner.get_action(subkey, params, step, subs)
-            print(action)
+            #print(action)
             #if len(action) > 1:
              #   action={list(action.keys())[0]:action[list(action.keys())[0]]}
             next_state, reward, done, _ = myEnv.step(action)
             total_reward += reward 
             rewards[step, trial] = reward
 
-            animation.parse_state(state, step, can_sizes, shelf_sizes)
-            
+            #animation.parse_state(state, step, can_sizes, shelf_sizes)
+            """
             print()
             print('step       = {}'.format(step))
             print('state      = {}'.format(state))
             print('action     = {}'.format(action))
             print('next state = {}'.format(next_state))
             print('reward     = {}'.format(reward))
+            """
             state = next_state
             if done:
-                animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
+                #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
                 #animation.create_video()
                 break
-        print(f'episode ended with reward {total_reward}')
+        #print(f'episode ended with reward {total_reward}')
         
     myEnv.close()
     if save:
         np.savetxt(f'{dom}_{inst}_slp.csv', rewards, delimiter=',')
+    return step
 
 
 def my_planner(env, trials, timeout, timeout_ps, save):
 
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']
-    print(key)
+    #print(key)
 
     rewards = np.zeros((myEnv.horizon, trials))
     for trial in range(trials):
-        print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
+        #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
+        """
         for i in params.keys():
             print(f'{i} : {params[i]}')
+            c = 0
+            for j in params[i]:
+                if params[i]==1:
+                    c+=1
+            print(len(params[i]), c)
+        """
         total_reward = 0
         state = myEnv.reset()
 
@@ -130,7 +146,7 @@ def my_planner(env, trials, timeout, timeout_ps, save):
                 actions.append({a:action[a]})
 
         
-        print(actions)
+        #print(actions)
         for step in range(len(actions)):
             #if len(action) > 1:
                 #   action={list(action.keys())[0]:action[list(action.keys())[0]]}
@@ -140,7 +156,7 @@ def my_planner(env, trials, timeout, timeout_ps, save):
             rewards[step, trial] = reward
 
             #animation.parse_state(state, step, can_sizes, shelf_sizes)
-            
+            """
             print()
             print('step       = {}'.format(step))
             print('state      = {}'.format(state))
@@ -148,11 +164,13 @@ def my_planner(env, trials, timeout, timeout_ps, save):
             print('next state = {}'.format(next_state))
             print('reward     = {}'.format(reward))
             state = next_state
+            """
             if done:
                 #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
                 #animation.create_video()
                 break
-        print(f'episode ended with reward {total_reward}')
+            
+        #print(f'episode ended with reward {total_reward}')
         myEnv.close()
         
     if save:
@@ -208,18 +226,88 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
     if save:
         np.savetxt(f'{dom}_{inst}_mpc.csv', rewards, delimiter=',')
 
+
+def modify_cfg_file(cfg_file_name, learning_rate, epochs):
+    # Read in the original file
+    with open(cfg_file_name, 'r') as f:
+        file_contents = f.read()
+
+    # Replace the learning rate and epochs
+    lines = file_contents.split('\n')
+    for i, line in enumerate(lines):
+        if "learning_rate'" in line:
+            lines[i] = f"optimizer_kwargs={{'learning_rate': {learning_rate}}}"
+        elif 'epochs' in line:
+            lines[i] = f'epochs={epochs}'
+    
+    # Join the lines back together and write the modified file back to disk
+    file_contents = '\n'.join(lines)
+    with open(cfg_file_name, 'w') as f:
+        f.write(file_contents)
+
+    
+    # Join the lines back together and write the modified file back to disk
+    file_contents = '\n'.join(lines)
+    with open(cfg_file_name, 'w') as f:
+        f.write(file_contents)
+
+def modify_mdp_file(mdp_file_name, new_horizon):
+    # Read in the original file
+    with open(mdp_file_name, 'r') as f:
+        file_contents = f.read()
+
+    # Find the line that specifies the horizon and replace its value
+    lines = file_contents.split('\n')
+    for i, line in enumerate(lines):
+        if 'horizon' in line:
+            lines[i] = f'   horizon = {new_horizon};'
+            break
+    else:
+        # If the horizon line isn't found, raise an error
+        raise ValueError('Could not find "horizon" field in MDP file')
+
+    # Join the lines back together and write the modified file back to disk
+    file_contents = '\n'.join(lines)
+    with open(mdp_file_name, 'w') as f:
+        f.write(file_contents)
+
+
+
     
 def main(env, replan, trials, timeout, timeout_ps, save):
     if replan:
         slp_replan(env, trials, timeout, timeout_ps, save)
-    else: 
-        slp_no_replan(env, trials, timeout, timeout_ps, save)
+    else:
+        import csv
+
+        learning_rates = (0.1, 1e8)
+        epochs = (1000, 10000, 100000)
+        horizon = (20, 200, 2000, 20000, 100000)
+
+        # Open the CSV file for writing
+        with open('Examples/BasicArm/results.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+
+            # Write the header row
+            writer.writerow(['Learning rate', 'Epochs', 'Horizon', 'Step'])
+
+            # Loop over all combinations of learning rates, epochs, and horizons
+            for i in learning_rates:
+                for j in epochs:
+                    modify_cfg_file('Planner/BasicArm.cfg', i, j)
+                    for z in horizon:
+                        modify_mdp_file('Examples/BasicArm/instance0.rddl', z)
+                        step = slp_no_replan(env, trials, timeout, timeout_ps, save)
+                        # Write the results for this combination to the CSV file
+                        writer.writerow([i, j, z, step+1])
+
+
     
         
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 100, 1, False
+        env, trials, timeout, timeout_ps, save = 'BasicArm', 1, 60 * 100, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)
