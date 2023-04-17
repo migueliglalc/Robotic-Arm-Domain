@@ -7,6 +7,6 @@ instance basic_arm_inst_mdp__1 {
 	non-fluents = nf_basic_arm_inst_mdp__1;
 
 	max-nondef-actions = pos-inf;
-   horizon = 100000;
+   horizon = 100;
 	discount = 1.0;
 }

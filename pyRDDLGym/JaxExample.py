@@ -50,7 +50,7 @@ def slp_train(planner, budget, **train_args):
     return params
 
 
-def slp_no_replan(env, trials, timeout, timeout_ps, save):
+def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
 
     can_sizes = [(1, 1), (1, 1), (1, 1)]
     shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
@@ -64,15 +64,10 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
         #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
-        """
+        
         for i in params.keys():
             print(f'{i} : {params[i]}')
-            c = 0
-            for j in params[i]:
-                if j>0:
-                    c+=1
-            print(c/len(params[i]))
-        """
+        
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
@@ -89,18 +84,24 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save):
             total_reward += reward 
             rewards[step, trial] = reward
 
-            #animation.parse_state(state, step, can_sizes, shelf_sizes)
-            """
+            
+            animation.parse_state(state, step, can_sizes, shelf_sizes)
+            
             print()
             print('step       = {}'.format(step))
             print('state      = {}'.format(state))
             print('action     = {}'.format(action))
             print('next state = {}'.format(next_state))
             print('reward     = {}'.format(reward))
-            """
+            
+            
             state = next_state
+
+            #if step==myEnv.horizon-1:
+            #animation.parse_state(state,  label, can_sizes, shelf_sizes)
+            
             if done:
-                #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
+                animation.parse_state(state,  label, can_sizes, shelf_sizes)
                 #animation.create_video()
                 break
         #print(f'episode ended with reward {total_reward}')
@@ -156,7 +157,7 @@ def my_planner(env, trials, timeout, timeout_ps, save):
             rewards[step, trial] = reward
 
             #animation.parse_state(state, step, can_sizes, shelf_sizes)
-            """
+            
             print()
             print('step       = {}'.format(step))
             print('state      = {}'.format(state))
@@ -164,7 +165,7 @@ def my_planner(env, trials, timeout, timeout_ps, save):
             print('next state = {}'.format(next_state))
             print('reward     = {}'.format(reward))
             state = next_state
-            """
+            
             if done:
                 #animation.parse_state(state, step + 1, can_sizes, shelf_sizes)
                 #animation.create_video()
@@ -227,7 +228,7 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
         np.savetxt(f'{dom}_{inst}_mpc.csv', rewards, delimiter=',')
 
 
-def modify_cfg_file(cfg_file_name, learning_rate, epochs):
+def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs):
     # Read in the original file
     with open(cfg_file_name, 'r') as f:
         file_contents = f.read()
@@ -239,6 +240,8 @@ def modify_cfg_file(cfg_file_name, learning_rate, epochs):
             lines[i] = f"optimizer_kwargs={{'learning_rate': {learning_rate}}}"
         elif 'epochs' in line:
             lines[i] = f'epochs={epochs}'
+        elif "'weight'" in line:
+            lines[i] = f"logic_kwargs={{'weight': {weight}}}"
     
     # Join the lines back together and write the modified file back to disk
     file_contents = '\n'.join(lines)
@@ -278,28 +281,36 @@ def main(env, replan, trials, timeout, timeout_ps, save):
     if replan:
         slp_replan(env, trials, timeout, timeout_ps, save)
     else:
+        
         import csv
 
-        learning_rates = (0.1, 1e8)
-        epochs = (1000, 10000, 100000)
-        horizon = (20, 200, 2000, 20000, 100000)
+        weights = [0.5]
+        learning_rates = [1]
+        epochs = [1000]
+        horizon = [100]
 
+        
         # Open the CSV file for writing
-        with open('Examples/BasicArm/results.csv', 'w', newline='') as f:
+        with open('Examples/Arm/results.csv', 'a+', newline='') as f:
             writer = csv.writer(f)
 
             # Write the header row
-            writer.writerow(['Learning rate', 'Epochs', 'Horizon', 'Step'])
+            writer.writerow(['Weight', 'Learning rate', 'Epochs', 'Horizon', 'Step'])
 
             # Loop over all combinations of learning rates, epochs, and horizons
-            for i in learning_rates:
-                for j in epochs:
-                    modify_cfg_file('Planner/BasicArm.cfg', i, j)
-                    for z in horizon:
-                        modify_mdp_file('Examples/BasicArm/instance0.rddl', z)
-                        step = slp_no_replan(env, trials, timeout, timeout_ps, save)
-                        # Write the results for this combination to the CSV file
-                        writer.writerow([i, j, z, step+1])
+            for i in weights:
+                for j in learning_rates:
+                    for k in epochs:
+                        modify_cfg_file('Planner/Arm.cfg', i, j, k)
+                        for z in horizon:
+                            label = f'W:{i}, L:{j}, E:{k}, H:{z}'
+                            print(label)
+                            modify_mdp_file('Examples/Arm/instance0.rddl', z)
+                            step = slp_no_replan(env, trials, timeout, timeout_ps, save, label)
+                            # Write the results for this combination to the CSV file
+                            writer.writerow([i, j, k, z, step+1])
+        
+        #slp_no_replan(env, trials, timeout, timeout_ps, save)
 
 
     
@@ -307,7 +318,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'BasicArm', 1, 60 * 100, 1, False
+        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 100, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

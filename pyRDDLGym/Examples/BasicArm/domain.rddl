@@ -13,8 +13,8 @@ domain basic_arm {
     x_position_c               : { non-fluent, real, default = 10 };
     y_position_c               : { non-fluent, real, default = 10 };
 
-    MAX_X                      :{non-fluent, real, default = 10};
-    MAX_Y                      :{non-fluent, real, default = 10};
+    MAX_X                      :{non-fluent, real, default = 11};
+    MAX_Y                      :{non-fluent, real, default = 11};
 
 
   // Actions 
@@ -34,7 +34,7 @@ domain basic_arm {
     };
 
   reward = (x_position_a'>=x_position_c ^ y_position_a'>=y_position_c)-
-           0.1*(~(x_motion==0.0) | ~(y_motion==0.0));
+            0.0*(x_position_a'>MAX_X|x_position_a'<0|y_position_a'>MAX_X|y_position_a'<0);
 
   termination{
       (x_position_a >= x_position_c)^(y_position_a>=y_position_c);

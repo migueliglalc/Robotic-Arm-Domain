@@ -1,0 +1,46 @@
+number-of-cans(?s) = sum_{?c: can}(on-shelf(?c, ?s));
+
+objective-shelf(?s) = forall_{?s1: shelf}(number-of-cans(?s) >= number-of-cans(?s1));
+
+distance(?c) = if(exists_{?s: shelf} (on-shelf(?c,?s) ^ working-shelf(?s))) then 
+                        sqrt[pow[x_position_a - x_position_c(?c),2] + pow[y_position_a - y_position_c(?c),2]]
+                       else 10000.0;
+
+closest(?c) = forall_{?c1: can}(distance(?c) <= distance(?c1));
+
+move-to-can(?c) =    (
+                      ~safe-position^(sqrt[pow[x_position_a + right-shift - left-shift - x_position_c(?c),2] + 
+                      pow[y_position_a + extend-arm - retract-arm - y_position_c(?c),2]] < distance(?c))
+                      |
+                      safe-position^(sqrt[pow[x_position_a + right-shift - left-shift - x_position_c(?c),2] + 
+                      pow[y_position_a + 5*extend-to-shelf - y_position_c(?c),2]] < distance(?c))
+                      );
+
+reward = 100*([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]) + 
+           50*([exists_{?s: shelf, ?c:can}(working-shelf(?s)^objective-shelf(?s)^put-down-conditions(?c,?s)^put-down(?c,?s))]) +
+           -50*([exists_{?s: shelf, ?c:can}(working-shelf(?s)^objective-shelf(?s)^pick-up-conditions(?c,?s)^pick-up(?c, ?s))]) +
+           20*([exists_{?s: shelf, ?c:can}(working-shelf(?s)^~objective-shelf(?s)^pick-up-conditions(?c,?s)^pick-up(?c, ?s))]) +
+           -20*([exists_{?s: shelf, ?c:can}(working-shelf(?s)^~objective-shelf(?s)^put-down-conditions(?c,?s)^put-down(?c,?s))]) +
+           2.5*(~arm-free ^ safe-position ^ exists_{?s: shelf, ?s1: shelf} (working-shelf(?s)^change-shelf(?s, ?s1)^objective-shelf(?s1))) +
+           -2.5*(~arm-free ^ safe-position ^ exists_{?s: shelf, ?s1: shelf} (working-shelf(?s)^change-shelf(?s, ?s1)^~objective-shelf(?s1))) +
+           5*(sum_{?c:can}(
+              if(arm-free^closest(?c)) then 
+                if(move-to-can(?c)) then 1/pow[distance(?c),2]
+                else -1.0
+              else 0.0
+            ))+
+            10*([exists_{?s:shelf}(~arm-free^working-shelf(?s)^~objective-shelf(?s)^retract-off-shelf)])+
+          
+           -100*([exists_{?s: shelf}(change-shelf(?s, ?s))])+
+           -100*([exists_{?s: shelf, ?s1:shelf}(change-shelf(?s, ?s1)^~working-shelf(?s))])+
+           -100*([exists_{?s: shelf, ?c:can}(working-shelf(?s)^~on-shelf(?c, ?s)^pick-up(?c, ?s))])+
+           -100*([exists_{?s: shelf, ?s1:shelf, ?c:can}(working-shelf(?s)^put-down(?c, ?s1)^~working-shelf(?s1))])+
+           -100*([exists_{?c: can, ?s:shelf}(pick-up(?c, ?s)^~pick-up-conditions(?c, ?s))])+
+           -100*([exists_{?c: can, ?s:shelf}(put-down(?c, ?s)^~put-down-conditions(?c, ?s))])+
+           -100*(safe-position^retract-off-shelf)+
+           -100*(~safe-position^extend-to-shelf)+
+           -100*(safe-position^(retract-arm>0|extend-arm>0))+
+           -100*(exists_{?s: shelf, ?s1: shelf}(arm-free^change-shelf(?s, ?s1)^objective-shelf(?s1)))+
+
+           -10*exists_{?c:can, ?s:shelf, ?s1:shelf}((extend-arm>0 | retract-arm>0 | right-shift>0 | left-shift>0 | 
+            change-shelf(?s, ?s1) | pick-up(?c, ?s) | put-down(?c, ?s) | retract-off-shelf | extend-to-shelf));

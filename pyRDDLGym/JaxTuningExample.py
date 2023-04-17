@@ -34,11 +34,9 @@ def tune(env, replan, trials, timeout, timeout_ps, iters, workers):
 
 if __name__ == "__main__":
     if len(sys.argv) < 7:
-<<<<<<< HEAD
         env, trials, timeout, timeout_ps, iters, workers = 'BasicArm', 1, 60, 1, 25, 4
-=======
-        env, trials, timeout, timeout_ps, iters, workers = 'MountainCar', 1, 10, 1, 20, 4
->>>>>>> 7f1bc6a06cb7af77e47f7b23f97e2a681812b04a
+        env, trials, timeout, timeout_ps, iters, workers = 'BasicArm', 1, 10, 1, 20, 4
+
     else:
         env, trials, timeout, timeout_ps, iters, workers = sys.argv[1:7]
         trials = int(trials)
