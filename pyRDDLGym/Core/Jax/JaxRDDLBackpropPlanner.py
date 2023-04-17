@@ -5,7 +5,7 @@ import jax.nn.initializers as initializers
 import numpy as np
 np.seterr(all='raise')
 import optax
-from typing import Dict, Iterable, Set, Tuple
+from typing import Callable, Dict, Iterable, Set, Tuple
 import warnings
 
 from pyRDDLGym.Core.ErrorHandling.RDDLException import RDDLTypeError
@@ -323,7 +323,10 @@ class JaxStraightLinePlan(JaxPlan):
         def _jax_wrapped_slp_predict_train(key, params, hyperparams, step, subs):
             actions = {}
             for (var, param) in params.items():
-                action = jnp.asarray(param[step, ...], dtype=compiled.REAL)
+                if step is None:
+                    action = jnp.asarray(param, dtype=compiled.REAL)
+                else:
+                    action = jnp.asarray(param[step, ...], dtype=compiled.REAL)
                 if ranges[var] == 'bool':
                     action = _jax_bool_param_to_action(var, action, hyperparams)
                 else:
@@ -335,7 +338,7 @@ class JaxStraightLinePlan(JaxPlan):
         def _jax_wrapped_slp_predict_test(key, params, hyperparams, step, subs):
             actions = {}
             for (var, param) in params.items():
-                action = jnp.asarray(param[step, ...])
+                action = jnp.asarray(param if step is None else param[step, ...])
                 prange = ranges[var]
                 if prange == 'bool':
                     action = action > bool_threshold
@@ -498,7 +501,8 @@ class JaxRDDLBackpropPlanner:
                  rollout_horizon: int=None,
                  use64bit: bool=False,
                  action_bounds: Dict[str, Tuple[float, float]]={},
-                 optimizer: optax.GradientTransformation=optax.rmsprop(0.1),
+                 optimizer: Callable[..., optax.GradientTransformation]=optax.rmsprop,
+                 optimizer_kwargs: Dict[str, object]={'learning_rate': 0.1},
                  clip_grad: float=None,
                  logic: FuzzyLogic=FuzzyLogic(),
                  use_symlog_reward: bool=False,
@@ -519,8 +523,9 @@ class JaxRDDLBackpropPlanner:
         :param use64bit: whether to perform arithmetic in 64 bit
         horizon parameter in the RDDL instance
         :param action_bounds: box constraints on actions
-        :param optimizer: an Optax algorithm that specifies how gradient updates
-        are performed
+        :param optimizer: a factory for an optax SGD algorithm
+        :param optimizer_kwargs: a dictionary of parameters to pass to the SGD
+        factory (e.g. which parameters are controllable externally)
         :param clip_grad: maximum magnitude of gradient updates
         :param logic: a subclass of FuzzyLogic for mapping exact mathematical
         operations to their differentiable counterparts 
@@ -544,6 +549,8 @@ class JaxRDDLBackpropPlanner:
         self.use64bit = use64bit
         self.clip_grad = clip_grad
         
+        # set optimizer
+        optimizer = optax.inject_hyperparams(optimizer)(**optimizer_kwargs)
         if clip_grad is None:
             self.optimizer = optimizer
         else:
@@ -589,6 +596,7 @@ class JaxRDDLBackpropPlanner:
         self.plan.compile(self.compiled,
                           _bounds=self._action_bounds,
                           horizon=self.horizon)
+        self.train_policy = jax.jit(self.plan.train_policy)
         self.test_policy = jax.jit(self.plan.test_policy)
         
         # roll-outs
@@ -693,7 +701,8 @@ class JaxRDDLBackpropPlanner:
     
     def optimize(self, key: random.PRNGKey,
                  epochs: int,
-                 step: int=1,
+                 step: int=1, 
+                 plot_step: int=None,
                  policy_hyperparams: Dict[str, object]=None,
                  subs: Dict[str, object]=None,
                  guess: Dict[str, object]=None) -> Iterable[Dict[str, object]]:
@@ -702,6 +711,7 @@ class JaxRDDLBackpropPlanner:
         :param key: JAX PRNG key
         :param epochs: the maximum number of steps of gradient descent
         :param step: frequency the callback is provided back to the user
+        :param plot_step: frequency to plot the plan and save result to disk
         :param policy_hyperparams: hyper-parameters for the policy/plan, such as
         weights for sigmoid wrapping boolean actions
         :param subs: dictionary mapping initial state and non-fluents to 
@@ -728,6 +738,7 @@ class JaxRDDLBackpropPlanner:
             policy_params = guess
             opt_state = self.optimizer.init(policy_params)
         best_params, best_loss = policy_params, jnp.inf
+        last_iter_improve = 0
         
         for it in range(epochs):
             
@@ -753,7 +764,12 @@ class JaxRDDLBackpropPlanner:
             # record the best plan so far
             if test_loss < best_loss:
                 best_params, best_loss = policy_params, test_loss
+                last_iter_improve = it
             
+            # save the plan figure
+            if plot_step is not None and it % plot_step == 0:
+                self._plot_actions(key, policy_params, policy_hyperparams, subs, it)
+                
             # periodically return a callback
             if it % step == 0 or it == epochs - 1:
                 callback = {
@@ -763,6 +779,7 @@ class JaxRDDLBackpropPlanner:
                     'best_return':-best_loss,
                     'params': policy_params,
                     'best_params': best_params,
+                    'last_iteration_improved': last_iter_improve,
                     'grad': train_log['grad'],
                     'updates': train_log['updates'],
                     **log
@@ -791,4 +808,32 @@ class JaxRDDLBackpropPlanner:
                 if ground_act != self.noop_actions[ground_var]:
                     grounded_actions[ground_var] = ground_act
         return grounded_actions
+
+    def _plot_actions(self, key, params, policy_hyperparams, subs, step):
+        try:
+            import matplotlib.pyplot as plt
+        except Exception as _:
+            print('matplotlib is not installed, aborting plot...')
+        else:
+            actions = self.train_policy(key, params, policy_hyperparams, None, subs)
+            fig, axs = plt.subplots(nrows=len(actions), constrained_layout=True)
+            for (ax, name) in zip(axs, actions):
+                values = np.asarray(actions[name], dtype=float)
+                values = np.reshape(values, newshape=(values.shape[0], -1))
+                values = np.transpose(values)
+                if self.rddl.variable_ranges[name] == 'bool':
+                    vmin, vmax = 0.0, 1.0
+                else:
+                    vmin, vmax = None, None                
+                img = ax.imshow(values, vmin=vmin, vmax=vmax, 
+                                cmap='seismic', aspect='auto')
+                img = ax.imshow(values, cmap='seismic', aspect='auto')
+                ax.set_xlabel('time')
+                ax.set_ylabel(name)
+                plt.colorbar(img, ax=ax)
+            domain = self.rddl.domainName()
+            inst = self.rddl.instanceName()
+            plt.savefig(f'plan_{domain}_{inst}_{step}.pdf', bbox_inches='tight')
+            plt.clf()
+            plt.close(fig)
 
