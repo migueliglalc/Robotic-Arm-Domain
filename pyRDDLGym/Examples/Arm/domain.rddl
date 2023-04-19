@@ -270,7 +270,9 @@ domain can_storage {
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
     };
 
-  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]);
+  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])])
+            -0.0 *(right-shift>0 | left-shift>0 | retract-arm>0 | extend-arm>0 | 
+                  ([exists_{?s1:shelf, ?s2: shelf}(change-shelf(?s2, ?s1))]) | ([exists_{?s1:shelf, ?c1:can}(pick-up(?c1, ?s1))]) | ([exists_{?s1:shelf, ?c1:can}(put-down(?c1, ?s1))]) | retract-off-shelf | extend-to-shelf);
 
   termination{
       [exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])];

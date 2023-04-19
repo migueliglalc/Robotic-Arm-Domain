@@ -27,3 +27,21 @@ Weight,Learning rate,Epochs,Horizon,Step
 0.0005,1,1000,100,100
 Weight,Learning rate,Epochs,Horizon,Step
 5,1,1000,100,100
+Weight,Learning rate,Epochs,Horizon,Step
+0.5,1,1000,100,100
+Weight,Learning rate,Epochs,Horizon,Step
+0.5,1,1000,100,100
+Weight,Learning rate,Epochs,Horizon,Step
+0.05,1,1000,100,100
+Weight,Learning rate,Epochs,Horizon,Step
+Weight,Learning rate,Epochs,Horizon,Step
+0.0001,1,1000,100,100
+Weight,Learning rate,Epochs,Horizon,Step
+0.0001,1,1000,10,10
+Weight,Learning rate,Epochs,Horizon,Step
+0.0001,1,1000,20,20
+Weight,Learning rate,Epochs,Horizon,Step
+Weight,Learning rate,Epochs,Horizon,Step
+Weight,Learning rate,Epochs,Horizon,Step
+0.0001,0.1,100000,20,20
+Weight,Learning rate,Epochs,Horizon,Step

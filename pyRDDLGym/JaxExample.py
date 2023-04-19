@@ -227,7 +227,7 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
         np.savetxt(f'{dom}_{inst}_mpc.csv', rewards, delimiter=',')
 
 
-def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs):
+def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs, horizon):
     # Read in the original file
     with open(cfg_file_name, 'r') as f:
         file_contents = f.read()
@@ -241,6 +241,9 @@ def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs):
             lines[i] = f'epochs={epochs}'
         elif "'weight'" in line:
             lines[i] = f"logic_kwargs={{'weight': {weight}}}"
+
+        elif "rollout_horizon" in line:
+            lines[i] = f"rollout_horizon = {horizon}"
     
     # Join the lines back together and write the modified file back to disk
     file_contents = '\n'.join(lines)
@@ -252,27 +255,6 @@ def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs):
     file_contents = '\n'.join(lines)
     with open(cfg_file_name, 'w') as f:
         f.write(file_contents)
-
-def modify_mdp_file(mdp_file_name, new_horizon):
-    # Read in the original file
-    with open(mdp_file_name, 'r') as f:
-        file_contents = f.read()
-
-    # Find the line that specifies the horizon and replace its value
-    lines = file_contents.split('\n')
-    for i, line in enumerate(lines):
-        if 'horizon' in line:
-            lines[i] = f'   horizon = {new_horizon};'
-            break
-    else:
-        # If the horizon line isn't found, raise an error
-        raise ValueError('Could not find "horizon" field in MDP file')
-
-    # Join the lines back together and write the modified file back to disk
-    file_contents = '\n'.join(lines)
-    with open(mdp_file_name, 'w') as f:
-        f.write(file_contents)
-
 
 
     
@@ -283,10 +265,10 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         
         import csv
 
-        weights = [0.5]
-        learning_rates = [1]
-        epochs = [1000]
-        horizon = [100]
+        weights = [0.001]
+        learning_rates = [0.01]
+        epochs = [1000000]
+        horizon = [20]
 
         
         # Open the CSV file for writing
@@ -300,11 +282,10 @@ def main(env, replan, trials, timeout, timeout_ps, save):
             for i in weights:
                 for j in learning_rates:
                     for k in epochs:
-                        modify_cfg_file('Planner/Arm.cfg', i, j, k)
                         for z in horizon:
                             label = f'W:{i}, L:{j}, E:{k}, H:{z}'
                             print(label)
-                            modify_mdp_file('Examples/Arm/instance0.rddl', z)
+                            modify_cfg_file('Planner/Arm.cfg', i, j, k, z)
                             step = slp_no_replan(env, trials, timeout, timeout_ps, save, label)
                             # Write the results for this combination to the CSV file
                             writer.writerow([i, j, k, z, step+1])
@@ -316,12 +297,8 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         
 if __name__ == "__main__":
     if len(sys.argv) < 6:
-<<<<<<< HEAD
         TF_CPP_MIN_LOG_LEVEL = 0
         env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 100, 1, False
-=======
-        env, trials, timeout, timeout_ps, save = 'Wildfire', 1, 60 * 2, 1, False
->>>>>>> 5689cf6101383ef158c78497d6bf83b6191ea80b
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

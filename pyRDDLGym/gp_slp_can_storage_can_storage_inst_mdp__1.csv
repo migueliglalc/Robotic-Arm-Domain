@@ -1,1 +1,1 @@
-worker,iteration,target,std,lr,w,wa
+pid,worker,iteration,target,best_target,kappa,std,lr,w,wa
