@@ -72,39 +72,46 @@ If the RDDL program is indeed differentiable (or a differentiable approximation 
 
 .. code-block:: python
 	
-    import jax
-    import optax  
+    import optax
     
     from pyRDDLGym import ExampleManager
     from pyRDDLGym import RDDLEnv
     from pyRDDLGym.Core.Jax.JaxRDDLBackpropPlanner import JaxRDDLBackpropPlanner
-	
+    from pyRDDLGym.Core.Jax.JaxRDDLBackpropPlanner import JaxStraightLinePlan
+    
     # specify the model
-    EnvInfo = ExampleManager.GetEnvInfo('mountaincar')
+    EnvInfo = ExampleManager.GetEnvInfo('Wildfire')
     myEnv = RDDLEnv.RDDLEnv(domain=EnvInfo.get_domain(), instance=EnvInfo.get_instance(0))
     model = myEnv.model
     
     # initialize the planner
     # note that actions should be constrained to [0, 2] for MountainCar
     planner = JaxRDDLBackpropPlanner(
-        model, 
+        model,
+        batch_size_train=32,
         plan=JaxStraightLinePlan(),
-        batch_size_train=32, 
-        optimizer=optax.rmsprop(0.01),
-        action_bounds={'action': (0.0, 2.0)})
-      
+        optimizer=optax.rmsprop,
+        optimizer_kwargs={'learning_rate': 0.1})
+    
     # train for 1000 epochs using gradient ascent - print progress every 50
-    for callback in planner.optimize(jax.random.PRNGKey(42), epochs=1000, step=10):
-    	print('step={} train_return={:.6f} test_return={:.6f}'.format(
+    # note that boolean actions are wrapped with sigmoid by default, so the 
+    # policy_hyperparams dictionary must be filled with weights for those sigmoid
+    # functions
+    policy_weights = {'cut-out': 10.0, 'put-out': 10.0}
+    for callback in planner.optimize(
+        jax.random.PRNGKey(42), epochs=1000, step=10, policy_hyperparams=policy_weights):
+        print('step={} train_return={:.6f} test_return={:.6f}'.format(
               str(callback['iteration']).rjust(4),
               callback['train_return'],
               callback['test_return']))
 
+The ``policy_hyperparams`` argument is required whenever the policy or plan representation takes additional hyper-parameters. 
+Further details are provided in the "Box Constraints" section below.
 The final action sequence can then be easily extracted from the final callback.
 
 .. code-block:: python
 	
-	plan = planner.get_action(<PRNG key>, callback['params'], <step>, None)
+	plan = planner.get_action(<PRNG key>, callback['params'], <step>, None, policy_weights)
 	
 
 Re-Planning: Planning in Stochastic Domains
@@ -140,7 +147,7 @@ This quantity overrides the default horizon specified in the RDDL instance.
 .. code-block:: python
 
     # specify the model
-    EnvInfo = ExampleManager.GetEnvInfo('wildfire')
+    EnvInfo = ExampleManager.GetEnvInfo('Wildfire')
     myEnv = RDDLEnv.RDDLEnv(domain=EnvInfo.get_domain(), instance=EnvInfo.get_instance(0))
     model = myEnv.model
     
@@ -150,21 +157,25 @@ This quantity overrides the default horizon specified in the RDDL instance.
         plan=JaxStraightLinePlan(),
         batch_size_train=32, 
         rollout_horizon=5,
-        optimizer=optax.rmsprop(0.01))
+        optimizer=optax.rmsprop,
+        optimizer_kwargs={'learning_rate': 0.01})
 
 The optimizer can then be invoked at every decision step (or periodically), as shown below:
 
 .. code-block:: python
 
+    policy_weights = {'put-out': 10.0, 'cut-out': 10.0}
     key = jax.random.PRNGKey(42)
     total_reward = 0
     state = myEnv.reset()
     for step in range(myEnv.horizon):
         key, subkey1, subkey2 = jax.random.split(key, num=3)
         *_, callback = planner.optimize(
-            subkey1, epochs=500, step=100, subs=myEnv.sampler.subs)
+            subkey1, epochs=500, step=100, policy_hyperparams=policy_weights, 
+            subs=myEnv.sampler.subs)
         action = planner.get_action(
-            subkey2, params=callback['params'], step=0, subs=None)
+            subkey2, params=callback['params'], step=0, 
+            subs=None, policy_hyperparams=policy_weights)
         next_state, reward, done, _ = myEnv.step(action)
         total_reward += reward 
         ...
@@ -173,7 +184,88 @@ The optimizer can then be invoked at every decision step (or periodically), as s
     myEnv.close()
     
 By executing this code, and comparing the realized return to the one obtained by the code in the previous section, 
-it is clear that re-planning can perform much better.
+it is clear that re-planning can perform much better on average than straight-line planning.
+
+Box Constraints on Action Fluents
+-------------------
+
+Currently, the JAX planner supports two different kind of actions constraints: box constraints and concurrency constraints. 
+
+Box constraints are useful for bounding each action-fluent independently into some range during optimization.
+Box constraints can be specified by passing a dictionary that maps action-fluent names to box bounds into the ``action_bounds`` keyword argument.
+The syntax for specifying box constraints is written as follows:
+
+.. code-block:: python
+
+    action_bounds={ <action_name1>: (lower1, upper1), <action_name2>: (lower2, upper2), ... }
+   
+where ``lower#`` and ``upper#`` can be any floating point value, including positive and negative infinity. 
+Passing ``None`` as a value to ``lower`` or ``upper`` indicates that a bound is not enforced, i.e. ``(10.0, None)`` indicates an action must be at least 10.
+The bounds are enforced by default using a projected gradient step that corrects the action parameters at each iteration during optimization.
+
+By default, boolean actions are wrapped using the sigmoid function:
+
+.. math::
+    
+    a = \frac{1}{1 + e^{-w \theta}},
+
+where :math:`\theta` denotes the trainable action parameters, and :math:`w` denotes a hyper-parameter that controls the sharpness of the approximation.
+
+.. note::
+   If ``wrap_sigmoid = True``, then the weights ``w`` as defined above must be specified in ``policy_hyperparams`` for each action when interfacing with the planner methods.
+   
+At test time, the action is aliased by evaluating the expression :math:`a > 0.5`, or equivalently :math:`\theta > 0`.
+The use of sigmoid for boolean actions can be controlled by setting ``wrap_sigmoid`` in ``JaxStraightLinePlan``.
+Non-boolean action-fluents can also be wrapped in a similar way, rather than use the projected gradient trick, by setting ``wrap_non_bool = True``.
+The details of this approach is described further in `equation 6 in this paper <https://ojs.aaai.org/index.php/AAAI/article/view/4744>`_.
+   
+Concurrency Constraints on Action Fluents
+-------------------
+
+The JAX planner also supports constraints on the maximum number of action-fluents that can be set at any given time. 
+This is given mathematically as a constraint of the form :math:`\sum_i a_i \leq B` for some constant :math:`B`.
+Specifically, if the ``max-nondef-actions`` property in the RDDL instance is less than the total number of boolean action fluents, then ``JaxRDDLBackpropPlanner`` will automatically apply a projected gradient technique to ensure ``max_nondef_actions`` is satisfied at each optimization step.
+Two methods are provided to ensure constraint satisfaction: the exact implementation details of the original method are provided `in this paper <https://ojs.aaai.org/index.php/ICAPS/article/view/3467>`_
+
+.. note::
+   Concurrency constraints on action-fluents are applied to boolean actions only: e.g., real and int actions will be ignored.
+
+Reward Normalization
+-------------------
+
+Some domains have rewards that vary significantly in magnitude between time steps, making optimization difficult without some form of normalization.
+Following the suggestion `in this paper <https://arxiv.org/pdf/2301.04104v1.pdf>`_, pyRDDLGym applies the symlog transform to the sampled rewards during back-prop.
+Mathematically, symlog is defined as
+
+.. math::
+    
+    \mathrm{symlog}(x) = \mathrm{sign}(x) * \ln(|x| + 1)
+
+which compresses the magnitudes of large positive and negative outcomes.
+The use of symlog can be enabled by the ``use_symlog_reward`` argument in ``JaxBackpropPlanner``.
+
+Utility Optimization
+-------------------
+
+By default, the Jax planner will optimize the expected sum of future reward. In settings that entail risk, this may not always be desirable.
+Following the framework `in this paper <https://ojs.aaai.org/index.php/AAAI/article/view/21226>`_, it is possible to optimize some non-linear utility of the return instead.
+For example, the entropic utility for risk-aversion parameter :math:`\beta` can be written mathematically as
+
+.. math::
+    
+    U(a_1, \dots a_T) = -\frac{1}{\beta} \log \mathbb{E}\left[e^{-\beta \sum_t R(s_t, a_t)} \right]
+
+In JAX, this can be passed to the planner as follows:
+
+.. code-block:: python
+
+    import jax.numpy as jnp
+    
+    def entropic(x, beta=0.00001):
+        return (-1.0 / beta) * jnp.log(jnp.mean(jnp.exp(-beta * x)) + 1e-12)
+       
+    planner = JaxRDDLBackpropPlanner(..., utility=entropic)
+    ...
 
 Dealing with Non-Differentiable Expressions
 -------------------
@@ -198,17 +290,24 @@ Specifically, the ``classify`` function above could be written as follows:
  
 .. code-block:: python
 
-    from pyRDDLGym.Core.Jax.JaxRDDLLogic import ProductLogic
+    from pyRDDLGym.Core.Jax.JaxRDDLLogic import FuzzyLogic
 
-    logic = ProductLogic()
+    logic = FuzzyLogic()    
+    And, _ = logic.And()
+    Not, _ = logic.Not()
+    Gre, _ = logic.greater()
+    Or, _ = logic.Or()
+    If, _ = logic.If()
 
-    def approximate_classify(x, y):
-        cond1 = logic.And(logic.greater(x, 0), logic.greater(y, 0))
-        cond2 = logic.And(logic.Not(logic.greater(x, 0)), logic.Not(logic.greater(y, 0)))
-        return logic.If(logic.Or(cond1, cond2), +1, -1)
+    def approximate_classify(x1, x2, w):
+        q1 = And(Gre(x1, 0, w), Gre(x2, 0, w), w)
+        q2 = And(Not(Gre(x1, 0, w), w), Not(Gre(x2, 0, w), w), w)
+        cond = Or(q1, q2, w)
+        pred = If(cond, +1, -1, w)
+        return pred
 
 ``ProductLogic`` replaces exact boolean (and other) expressions with fuzzy logic rules that are approximately equal to their exact counterparts.
-For illustration, calling ``approximate_classify`` with ``x=0.5`` and ``y=1.5`` returns 0.98661363, which is very close to 1.
+For illustration, calling ``approximate_classify`` with ``x=0.5``, ``y=1.5`` and ``w=10`` returns 0.98661363, which is very close to 1.
 
 It is possible to gain fine-grained control over how pyRDDLGym should perform differentiable relaxations.
 The abstract class ``FuzzyLogic``, from which ``ProductLogic`` is derived, can be sub-classed to specify how each mathematical operation should be approximated in JAX.
@@ -219,7 +318,7 @@ This logic can be passed to the planner as an optimal argument:
     planner = JaxRDDLBackpropPlanner(
         model, 
         ...,
-        logic=ProductLogic())
+        logic=FuzzyLogic())
 
 Customizing the Differentiable Operations
 -------------------
@@ -265,55 +364,34 @@ Then, a random variable :math:`X` with probability mass function :math:`p_1, \do
 where the approximation rule in the above table is used for argmax.
 Further details about Gumbel-softmax can be found `in this paper <https://arxiv.org/pdf/1611.01144.pdf>`_.
 
-Any operation(s) can be replaced by the user by sub-classing ``FuzzyLogic`` or ``ProductLogic``.
+Any operation(s) can be replaced by the user by sub-classing ``FuzzyLogic``.
 For example, the RDDL operation :math:`a \text{ ^ } b` can be replaced with a user-specified one by sub-classing as follows:
 
 .. code-block:: python
  
-    class NewLogic(ProductLogic):
+    class NewLogic(FuzzyLogic):
         
-        def And(self, a, b):
-            ...
-            return ...
+        def And(self):
+            
+            def jax_and_operation(a, b, param):
+                ...
+            
+            new_parameter = (('weight', 'logical_and') 
+            
+            return jax_and_operation, new_parameter
 
+Here, ``jax_and_operation`` represents an inner jax expression that computes the value of ``a and b``, and is returned as part of the ``And()`` call.
+The ``new_parameter`` describes any new parameters that are introduced that must be passed to the ``jax_and_operation``.
+These take the form ``((<param_type>, <expr_type>), <default_value>)``, where the inner tuple forms a key ``<param_type>_<expr_type>`` used to refer to parameters inside the compiled jax expression, and ``<default_value>`` is a default numeric value of the parameter(s).
 A new instance of ``NewLogic`` can then be passed to ``JaxRDDLBackpropPlanner`` as described above.
 
-Constraints on Action Fluents
--------------------
-
-Currently, the JAX planner supports two different kind of actions constraints. 
-Box constraints can be specified by passing a dictionary that maps action-fluent names to box bounds to the ``action_bounds`` keyword argument, as illustrated in the introductory example for mountain car.
-The syntax for specifying box constraints is written as follows:
+The parameters of jax logic expressions can be modified at run-time (e.g. during training). To do this, it is possible to retrieve the names and values of all such parameters in the computation graph as follows:
 
 .. code-block:: python
 
-    action_bounds={ <action_name1>: (lower1, upper1), <action_name2>: (lower2, upper2), ... }
-   
-where ``lower#`` and ``upper#`` can be any floating point value, including positive and negative infinity.
+    model_params = planner.compiled.model_params
 
-.. note::
-   Boolean actions are automatically clipped to (0, 1), even if not specified in ``action_bounds``.
-
-The JAX planner also supports constraints on the maximum number of action-fluents that can be set at any given time.
-Specifically, if the ``max-nondef-actions`` property in the RDDL instance is less than the total number of boolean action fluents, then ``JaxRDDLBackpropPlanner`` will automatically apply a projected gradient technique to ensure ``max_nondef_actions`` is satisfied at each optimization step.
-The exact implementation details are provided `in this paper <https://ojs.aaai.org/index.php/ICAPS/article/view/3467>`_
-
-.. note::
-   Concurrency constraints on action-fluents are applied to boolean actions only: e.g., real and int actions will be ignored.
-
-Reward Normalization
--------------------
-
-Some domains have rewards that vary significantly in magnitude between time steps, making optimization difficult without some form of normalization.
-Following the suggestion `in this paper <https://arxiv.org/pdf/2301.04104v1.pdf>`_, pyRDDLGym applies the symlog transform to the sampled rewards during back-prop.
-Mathematically, symlog is defined as
-
-.. math::
-    
-    \mathrm{symlog}(x) = \mathrm{sign}(x) * \ln(|x| + 1)
-
-which compresses the magnitudes of large positive and negative outcomes.
-The use of symlog can be enabled by the ``use_symlog_reward`` argument in ``JaxBackpropPlanner``.
+During training, these values can be modified before passing to other subroutines in the planner, such as ``update``. 
 
 Limitations
 -------------------
@@ -321,14 +399,12 @@ Limitations
 We cite several limitations of the current baseline JAX optimizer:
 
 * Not all operations have natural differentiable relaxations. Currently, the following are not supported:
-	* integer-valued functions such as round, floor, ceil
 	* nested fluents such as fluent1(fluent2(?p))
 	* distributions that are not naturally reparameterizable such as Poisson, Gamma and Beta
 * Some relaxations can accumulate a high error relative to their exact counterparts, particularly when stacking CPFs via the chain rule for long roll-out horizons
 * Some relaxations may not be mathematically consistent with one another
 	* no guarantees are provided about dichotomy of equality, e.g. a == b, a > b and a < b do not necessarily "sum" to one, but in many cases should be close
 	* if this is a concern, it is recommended to override some operations in ``ProductLogic`` to suit the user's needs
-* The parameter :math:`w` is fixed: support for annealing or otherwise modifying this value during optimization may be added in the future.
 * Termination conditions and state/action constraints are not considered in the optimization (but can be checked at test-time).
 
 The goal of the JAX optimizer was not to replicate the state-of-the-art, but to provide a simple baseline that can be easily built-on.
