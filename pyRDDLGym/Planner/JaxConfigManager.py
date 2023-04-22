@@ -36,13 +36,15 @@ def get(path: str, **optional_args) -> Dict[str, object]:
     try:
         if not use_repo:
             raise Exception
-        print(f'reading domain {domain_name} from rddlrepository...')
+        warnings.warn(f'reading domain {domain_name} from rddlrepository...',
+                      stacklevel=2)
         from rddlrepository.Manager.RDDLRepoManager import RDDLRepoManager
         manager = RDDLRepoManager()
         EnvInfo = manager.get_problem(domain_name)
     except:
-        print(f'failed to read from rddlrepository, '
-              f'reading domain {domain_name} from Examples...')
+        warnings.warn(f'failed to read from rddlrepository, '
+                      f'reading domain {domain_name} from Examples...',
+                      stacklevel=2)
         EnvInfo = ExampleManager.GetEnvInfo(domain_name)
     
     env_args['domain'] = EnvInfo.get_domain()
@@ -73,6 +75,11 @@ def get(path: str, **optional_args) -> Dict[str, object]:
         opt_args['method_kwargs']['initializer'] = initializer
         if 'initializer_kwargs' in opt_args['method_kwargs']:
             del opt_args['method_kwargs']['initializer_kwargs']
+            
+    if 'method_kwargs' in opt_args and 'activation' in opt_args['method_kwargs']:
+        opt_args['method_kwargs']['activation'] = getattr(
+            jax.nn, opt_args['method_kwargs']['activation'])
+        
     opt_args['plan'] = getattr(JaxRDDLBackpropPlanner, opt_args['method'])(
         **opt_args['method_kwargs'])
     opt_args['optimizer'] = getattr(optax, opt_args['optimizer'])
