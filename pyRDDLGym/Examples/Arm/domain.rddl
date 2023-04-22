@@ -17,44 +17,43 @@ domain can_storage {
 
   pvariables {
 
-  // Nonfluents: probability constants; int values chosen over real to permit nominalization of integer values for classical planners
-    MIN_X(shelf)  	     : { non-fluent, real, default = 0 };
-    MIN_Y(shelf) 	     : { non-fluent, real, default = 0 };
-    MAX_X(shelf)  	     : { non-fluent, real, default = 10 };
-    MAX_Y(shelf) 	     : { non-fluent, real, default = 10 };
-    SIZE_X_a	           : { non-fluent, real, default = 1 };
-    SIZE_X_c(can)	     : { non-fluent, real, default = 1 };
-    SIZE_Y_c(can)	     : { non-fluent, real, default = 1 };
-    EPSILON            : {non-fluent, real, default = 1 };
+    
+    MIN_X(shelf)              : { non-fluent, real, default = 0 };
+    MIN_Y(shelf)              : { non-fluent, real, default = 0 };
+    MAX_X(shelf)              : { non-fluent, real, default = 10 };
+    MAX_Y(shelf)              : { non-fluent, real, default = 10 };
+    SIZE_X_a                  : { non-fluent, real, default = 1 };
+    SIZE_X_c(can)             : { non-fluent, real, default = 1 };
+    SIZE_Y_c(can)             : { non-fluent, real, default = 1 };
+    EPSILON                   : { non-fluent, real, default = 1 };
+    SAFE_POSITION_Y           : { non-fluent, int, default = -5 };
 
-    on-shelf(can,shelf)        : { state-fluent, bool, default = false };
-    holding(can)               : { state-fluent, bool, default = false }; 
-    arm-free                   : { state-fluent, bool, default = false };
-    working-shelf(shelf)       : { state-fluent, bool, default = false };  
-    x_position_a               : { state-fluent, real, default = 0 };
-    y_position_a               : { state-fluent, real, default = 0 }; //assume is the left most coordinate
-    x_position_c(can)          : { state-fluent, real, default = 0 };
-    y_position_c(can)          : { state-fluent, real, default = 0 };
-    safe-position              : { state-fluent, bool, default = false};
+    on-shelf(can,shelf)       : { state-fluent, bool, default = false };
+    holding(can)              : { state-fluent, bool, default = false }; 
+    working-shelf(shelf)      : { state-fluent, bool, default = false };  
+    x_position_a              : { state-fluent, real, default = 0 };
+    y_position_a              : { state-fluent, real, default = 0 }; //assume is the left most coordinate
+    x_position_c(can)         : { state-fluent, real, default = 0 };
+    y_position_c(can)         : { state-fluent, real, default = 0 };
 
-  // Intermediate fluents
-    break-extension(can, shelf)         : { interm-fluent, bool}; // returns whether can avoids extension of arm in shelf of the given real size
-    break-right-shift(can, shelf)       : { interm-fluent, bool };  // returns whether can avoids right a shift of arm in shelf of the given real size
-    break-left-shift(can, shelf)        : {interm-fluent, bool}; // returns whether the can avoids a left shift of the arm in shelf of the given real size 
-    put-down-conditions(can,shelf)      : {interm-fluent, bool};
-    pick-up-conditions(can, shelf)      : {interm-fluent, bool};
-    different-can(can, can)             : {interm-fluent, bool}; //returns true if both cans are the same
+    // Intermediate fluents
+    safe-position                      : { interm-fluent, bool};
+    arm-free                           : { interm-fluent, bool};
+    break-extension(can, shelf)        : { interm-fluent, bool};  // returns whether can avoids extension of arm in shelf of the given real size
+    break_x(can, shelf)                : { interm-fluent, bool};  // returns whether the can avoids a left or right shift of the arm in shelf
+    put-down-conditions(can,shelf)     : { interm-fluent, bool};
+    pick-up-conditions(can, shelf)     : { interm-fluent, bool};
+    different-can(can, can)            : { interm-fluent, bool};  //returns true if both cans are the same
 
-  // Actions 
-    extend-arm                 : { action-fluent, real, default = 0 }; //
-    retract-arm                : { action-fluent, real, default = 0 };
-    retract-off-shelf          : { action-fluent, bool, default = false };
-    right-shift                : { action-fluent, real, default = 0 };
-    left-shift	               : { action-fluent, real, default = 0 };
-    extend-to-shelf            : { action-fluent, bool, default = false };
-    pick-up(can,shelf)         : { action-fluent, bool, default = false };
-    put-down(can,shelf)        : { action-fluent, bool, default = false };
-    change-shelf(shelf,shelf)  : { action-fluent, bool, default = false };
+    // Actions 
+    move_x                      : { action-fluent, real, default = 0 }; //
+    move_y                      : { action-fluent, real, default = 0 };
+    retract-off-shelf           : { action-fluent, bool, default = false };
+    extend-to-shelf             : { action-fluent, bool, default = false };
+    pick-up(can,shelf)          : { action-fluent, bool, default = false };
+    put-down(can,shelf)         : { action-fluent, bool, default = false };
+    change-shelf(shelf,shelf)   : { action-fluent, bool, default = false };
+
   };
 
   cpfs {
@@ -62,59 +61,56 @@ domain can_storage {
     different-can(?c1, ?c2) = if(~(x_position_c(?c1)==x_position_c(?c2) ^ y_position_c(?c1)==y_position_c(?c2))) then true
                               else false;
 
-    break-right-shift(?c, ?s) = if(~(holding(?c))^working-shelf(?s)^on-shelf(?c, ?s)^(x_position_c(?c)>x_position_a)) then //basic
-                                  if( //arm crash
+    break_x(?c, ?s) = if(~(holding(?c))^working-shelf(?s)^on-shelf(?c, ?s)) then //basic
+                        if(
+                            ( //arm crash
+                              (
+                                (
+                                  (x_position_c(?c) > x_position_a) ^
+                                  (x_position_a + SIZE_X_a + move_x > x_position_c(?c)) ^
+                                  (move_x > 0)
+                                )
+                                |
+                                (
+                                  (x_position_c(?c) + SIZE_X_c(?c) < x_position_a) ^
+                                  (x_position_a + move_x < x_position_c(?c) + SIZE_X_c(?c)) ^
+                                  (move_x < 0)
+                                )
+                              ) ^
+                              (y_position_a >= y_position_c(?c))
+                            )
+                            |
+                            (
+                                [exists_{?c1:can}( //can crash
+                                    holding(?c1)^
                                     (
-                                      ( (x_position_a + SIZE_X_a + right-shift)>x_position_c(?c) )^
-                                      ( y_position_a>y_position_c(?c) )
-                                    )
-                                    |
+                                      (
+                                        (x_position_c(?c1) < x_position_c(?c)) ^
+                                        (x_position_c(?c1) + SIZE_X_c(?c1) + move_x >= x_position_c(?c)) ^
+                                        (move_x > 0)
+                                      )
+                                      |
+                                      (
+                                        (x_position_c(?c1) > x_position_c(?c)) ^
+                                        (x_position_c(?c1) + move_x <= (x_position_c(?c) + SIZE_X_c(?c))) ^
+                                        (move_x < 0)
+                                      )
+                                    ) ^
                                     (
-                                      [exists_{?c1:can}( //can crash
-                                        holding(?c1)^
-                                        ( (x_position_c(?c1)+SIZE_X_c(?c1)+ right-shift)>=x_position_c(?c) )^
-                                        ( 
-                                          ( (( y_position_c(?c1)+SIZE_Y_c(?c1))>y_position_c(?c))^
-                                            (( y_position_c(?c1)+SIZE_Y_c(?c1))<=( y_position_c(?c)+SIZE_Y_c(?c))))
-                                          |
-                                          ( (y_position_c(?c1)<( y_position_c(?c)+SIZE_Y_c(?c)))^
-                                            (y_position_c(?c1)>y_position_c(?c)) ) 
-                                        )
-                                      )]
+                                      (((y_position_c(?c1) + SIZE_Y_c(?c1)) > y_position_c(?c)) ^
+                                      ((y_position_c(?c1) + SIZE_Y_c(?c1)) <= (y_position_c(?c) + SIZE_Y_c(?c)))) |
+                                      ((y_position_c(?c1) < (y_position_c(?c) + SIZE_Y_c(?c))) ^
+                                      (y_position_c(?c1) > y_position_c(?c)))
                                     )
-                                  ) then true
-                                  else false
-                                else false;
+                                )]
+                            )) then true
+                        else false
+                    else false;                    
 
-
-    break-left-shift(?c, ?s) = if(~(holding(?c))^working-shelf(?s)^on-shelf(?c, ?s)^(x_position_c(?c)<x_position_a)) then //basic
-                                  if( //arm crash
-                                    (
-                                      ( (x_position_a - left-shift)<(x_position_c(?c)+SIZE_X_c(?c)) )^
-                                      ( y_position_a>=y_position_c(?c) )
-                                    )
-                                    |
-                                    (
-                                      [exists_{?c1:can}( //can crash
-                                        holding(?c1)^
-                                        ( (x_position_c(?c1) - left-shift)>=(x_position_c(?c)+SIZE_X_c(?c)) )^
-                                        ( 
-                                          ( (( y_position_c(?c1)+SIZE_Y_c(?c1))>y_position_c(?c))^
-                                            (( y_position_c(?c1)+SIZE_Y_c(?c1))<=( y_position_c(?c)+SIZE_Y_c(?c))))
-                                          |
-                                          ( (y_position_c(?c1)<( y_position_c(?c)+SIZE_Y_c(?c)))^
-                                            (y_position_c(?c1)>y_position_c(?c)) ) 
-                                        )
-                                      )]
-                                    )
-                                  ) then true
-                                  else false
-                                else false;
-                                                   
 
     break-extension(?c, ?s) = if (~holding(?c)^working-shelf(?s)^~safe-position^on-shelf(?c,?s)) then
                                 if(
-                                  ( ( (y_position_a + extend-arm)>y_position_c(?c) )^ //check y
+                                  ( ( (y_position_a + move_y)>y_position_c(?c) )^ //check y
                                     ( 
                                       (
                                         ( (x_position_a + SIZE_X_a)> x_position_c(?c))^
@@ -131,7 +127,7 @@ domain can_storage {
                                   (
                                     [exists_{?c1:can}(
                                       holding(?c1)^
-                                      ( ( (y_position_c(?c1) + SIZE_Y_c(?c1) + extend-arm)>y_position_c(?c) )^ //check y
+                                      ( ( (y_position_c(?c1) + SIZE_Y_c(?c1) + move_y)>y_position_c(?c) )^ //check y
                                         ( 
                                           (
                                             ( (x_position_c(?c1) + SIZE_X_c(?c1))> x_position_c(?c))^
@@ -150,132 +146,124 @@ domain can_storage {
                                 else false
                               else false;
 
-    put-down-conditions(?c,?s) = 
 
-      if([sum_{?s1: shelf, ?c1: can}(put-down(?c1, ?s1))]>1)
-        then false
-      else 
-        (holding(?c) ^ working-shelf(?s) ^~safe-position);
-
-    pick-up-conditions(?c, ?s) =
-
-    if([sum_{?s1: shelf, ?c1: can}(pick-up(?c1, ?s1))]>1)
-        then false
-    else
-    if (arm-free ^ working-shelf(?s) ^ on-shelf(?c, ?s) ^ ~safe-position) then
-        if (
-            ((x_position_a < x_position_c(?c)) ^ ((x_position_a + SIZE_X_a) > x_position_c(?c)))
-            | ((x_position_a >= x_position_c(?c)) ^ (x_position_a < (x_position_c(?c) + SIZE_X_c(?c))))
-        ) then
-            if (
-                ((y_position_c(?c) - y_position_a) < EPSILON)
-                ^ (~[exists_{?c1:can} (
-                    different-can(?c, ?c1) ^
-                    (
-                        ((y_position_c(?c1) + SIZE_Y_c(?c1)) < y_position_c(?c))
-                        ^ ((y_position_c(?c1) + SIZE_Y_c(?c1)) > (y_position_a))
-                    ) ^
-                    (
-                        (
-                            (x_position_c(?c1) > x_position_c(?c)) ^ (x_position_c(?c1) < x_position_c(?c) + SIZE_X_c(?c))
-                        )
-                        | (
-                            (x_position_c(?c1) < x_position_c(?c)) ^ (x_position_c(?c1) + SIZE_X_c(?c1) > x_position_c(?c))
-                        )
-                    )
-                )])
-            ) then true
-            else false
-        else false
-    else false;
-
-    holding'(?c) = 
-        if ([sum_{?s:shelf}(pick-up-conditions(?c,?s)^pick-up(?c, ?s))]==1)
-          then true
-        else if ([sum_{?s:shelf}(put-down-conditions(?c,?s)^put-down(?c,?s))]==1)
-          then false
-        else holding(?c);
-
-    arm-free' = 
-      if ([sum_{?c: can, ?s:shelf} (pick-up-conditions(?c,?s)^pick-up(?c, ?s))]==1)
-        then false
-      else if ([sum_{?c:can, ?s:shelf}(put-down-conditions(?c,?s)^put-down(?c,?s))]==1)
-        then true
-      else arm-free;
-
-    safe-position' = 
-      if (retract-off-shelf)
-    		then true
-			else if (extend-to-shelf)
-				then false
-			else safe-position;
-
-    working-shelf'(?s2) =
-      if([sum_{?s1: shelf, ?s3:shelf} (change-shelf(?s1, ?s3))]>1)
-        then working-shelf(?s2)
-
-      else if ([sum_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1,?s2)^safe-position^?s1~=?s2)]==1)
-        then true
-      else if ([sum_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2,?s1)^safe-position^?s1~=?s2)]==1)
-        then false
-      else working-shelf(?s2);
-    
-    on-shelf'(?c, ?s) = 
-      if (put-down-conditions(?c,?s)^put-down(?c,?s))
-        then true
-      else if (pick-up-conditions(?c,?s)^pick-up(?c, ?s))
-        then false
-      else on-shelf(?c, ?s);
+    put-down-conditions(?c,?s) = if([sum_{?s1: shelf, ?c1: can}(put-down(?c1, ?s1))]>1)
+                                    then false
+                                 else 
+                                    (holding(?c) ^ working-shelf(?s) ^~safe-position);
 
 
-    x_position_a' = if((right-shift>0.0 + left-shift>0.0 + extend-arm>0.0 + retract-arm>0.0)>1) then x_position_a
+    pick-up-conditions(?c, ?s) = if([sum_{?s1: shelf, ?c1: can}(pick-up(?c1, ?s1))]>1)
+                                    then false
+                                  else
+                                  if (arm-free ^ working-shelf(?s) ^ on-shelf(?c, ?s) ^ ~safe-position) then
+                                      if (
+                                          ((x_position_a < x_position_c(?c)) ^ ((x_position_a + SIZE_X_a) > x_position_c(?c)))
+                                          | ((x_position_a >= x_position_c(?c)) ^ (x_position_a < (x_position_c(?c) + SIZE_X_c(?c))))
+                                      ) then
+                                          if (
+                                              ((y_position_c(?c) - y_position_a) < EPSILON)
+                                              ^ (~[exists_{?c1:can} (
+                                                  different-can(?c, ?c1) ^
+                                                  (
+                                                      ((y_position_c(?c1) + SIZE_Y_c(?c1)) < y_position_c(?c))
+                                                      ^ ((y_position_c(?c1) + SIZE_Y_c(?c1)) > (y_position_a))
+                                                  ) ^
+                                                  (
+                                                      (
+                                                          (x_position_c(?c1) > x_position_c(?c)) ^ (x_position_c(?c1) < x_position_c(?c) + SIZE_X_c(?c))
+                                                      )
+                                                      | (
+                                                          (x_position_c(?c1) < x_position_c(?c)) ^ (x_position_c(?c1) + SIZE_X_c(?c1) > x_position_c(?c))
+                                                      )
+                                                  )
+                                              )])
+                                          ) then true
+                                          else false
+                                      else false
+                                  else false;
 
-                    else if([exists_{?c:can, ?s:shelf}(break-right-shift(?c,?s)|break-left-shift(?c,?s))]) 
+
+    holding'(?c) = if ([sum_{?s:shelf}(pick-up-conditions(?c,?s)^pick-up(?c, ?s))]==1)
+                      then true
+                    else if ([sum_{?s:shelf}(put-down-conditions(?c,?s)^put-down(?c,?s))]==1)
+                      then false
+                    else holding(?c);
+
+
+    arm-free = [forall_{?c: can}(~holding(?c))];
+
+    safe-position = y_position_a==SAFE_POSITION_Y;
+
+    working-shelf'(?s2) = //if([sum_{?s1: shelf, ?s3:shelf} (change-shelf(?s1, ?s3))]>1)
+                            //then working-shelf(?s2)
+
+                          if ([sum_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1,?s2)^safe-position^?s1~=?s2)]==1)
+                            then true
+                          else if ([sum_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2,?s1)^safe-position^?s1~=?s2)]==1)
+                            then false
+                          else working-shelf(?s2);
+                          
+                          on-shelf'(?c, ?s) = 
+                            if (put-down-conditions(?c,?s)^put-down(?c,?s))
+                              then true
+                            else if (pick-up-conditions(?c,?s)^pick-up(?c, ?s))
+                              then false
+                            else on-shelf(?c, ?s);
+
+
+    x_position_a' = if((move_x~=0.0 + move_y~=0.0)>1) then x_position_a
+
+                    else if([exists_{?c:can, ?s:shelf}(break_x(?c,?s))]) 
                       then x_position_a
                     else
                       if (
                           [exists_{?s:shelf}(
                             working-shelf(?s)^
-                            ( (x_position_a - left-shift + right-shift)<MIN_X(?s) 
-                            | (x_position_a + SIZE_X_a + right-shift - left-shift)>MAX_X(?s) )
+                            ( (x_position_a + move_x)<MIN_X(?s) 
+                            | (x_position_a + SIZE_X_a + move_x)>MAX_X(?s) )
                             |
-                            ([exists_{?c:can}(holding(?c)^( (x_position_c(?c) - left-shift + right-shift)<MIN_X(?s) 
-                            | (x_position_c(?c) + SIZE_X_c(?c) + right-shift - left-shift)>MAX_X(?s) ))])
+                            ([exists_{?c:can}(holding(?c)^( (x_position_c(?c) + move_x)<MIN_X(?s) 
+                            | (x_position_c(?c) + SIZE_X_c(?c) + move_x)>MAX_X(?s) ))])
                           )]
                       ) then x_position_a
                       else
-                        x_position_a + right-shift - left-shift;
+                        x_position_a + move_x;
 
 
-    y_position_a' = if((right-shift>0.0 + left-shift>0.0 + extend-arm>0.0 + retract-arm>0.0)>1) then y_position_a
+    y_position_a' = if((move_x~=0.0 + move_y~=0.0)>1) then y_position_a
             
-                    else if(retract-off-shelf) then -5 //if not safe position
+                    else if(retract-off-shelf) then SAFE_POSITION_Y //if not safe position
                     else if (extend-to-shelf) 
                       then if(safe-position) then 0 //if extend from safe-position -> y=0
                            else y_position_a
                     else if ([exists_{?c:can, ?s:shelf}(break-extension(?c, ?s))]) //check break-extension
                       then y_position_a
-                    else if ((y_position_a - retract-arm + extend-arm)<0) //check negative retract ->not possible
+                    else if ((y_position_a + move_y)<0) //check negative retract ->not possible
                       then y_position_a
                     else if ([exists_{?c:can,?s:shelf}(holding(?c)^~safe-position^working-shelf(?s)^
-                            (y_position_a + SIZE_Y_c(?c) + extend-arm - retract-arm)>MAX_Y(?s))]) //check limit when holding can
+                            (y_position_a + SIZE_Y_c(?c) + move_y)>MAX_Y(?s))]) //check limit when holding can
                               then y_position_a
                     else if ([exists_{?s:shelf}(~safe-position^working-shelf(?s)^
-                            (y_position_a + extend-arm - retract-arm)>MAX_Y(?s))]) //check limit when not holding can
+                            (y_position_a + move_y)>MAX_Y(?s))]) //check limit when not holding can
                               then y_position_a
                     else if (safe-position) then y_position_a
-                    else y_position_a + extend-arm - retract-arm;
+                    else y_position_a + move_y;
 
-    x_position_c'(?c) = if(holding'(?c)^~(x_position_a==x_position_a')) then x_position_c(?c) + right-shift - left-shift else x_position_c(?c);
+
+    x_position_c'(?c) = if(holding'(?c)^~(x_position_a==x_position_a')) then x_position_c(?c) + move_x else x_position_c(?c);
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
     };
 
-  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])])
-            -0.0 *(right-shift>0 | left-shift>0 | retract-arm>0 | extend-arm>0 | 
-                  ([exists_{?s1:shelf, ?s2: shelf}(change-shelf(?s2, ?s1))]) | ([exists_{?s1:shelf, ?c1:can}(pick-up(?c1, ?s1))]) | ([exists_{?s1:shelf, ?c1:can}(put-down(?c1, ?s1))]) | retract-off-shelf | extend-to-shelf);
+  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]);
 
   termination{
       [exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])];
+  };
+
+  state-invariants{
+    [sum_{?s: shelf}(working-shelf(?s))]<=1;
+    [sum_{?c: can}(holding(?c))]<=1;
   };
   }
 

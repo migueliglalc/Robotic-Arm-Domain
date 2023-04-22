@@ -41,8 +41,9 @@ class AdhocAgent(BaseAgent):
     def sample_action(self, state=None):
         actions = []
         actions.append({'extend-to-shelf': 1.0})
-        actions.append({'right-shift': 2.5})
-        actions.append({'extend-arm': 1.75})
+        actions.append({'move_y': 2.5})
+        actions.append({'move_x': 0.75})
+        actions.append({'move_x': -0.75})
         actions.append({'pick-up___c0__s1': 1.0})
         actions.append({'retract-off-shelf': 1.0})
         actions.append({'change-shelf___s1__s2': 1.0})

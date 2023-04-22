@@ -813,7 +813,7 @@ class JaxRDDLBackpropPlanner:
             if use_symlog:
                 rewards = jnp.sign(rewards) * jnp.log1p(jnp.abs(rewards))
             if gamma < 1:
-                horizon = rewards.shape[1]
+                horizon = rewards.shape[0]
                 discount = jnp.power(gamma, jnp.arange(horizon))
                 discount = discount[jnp.newaxis, ...]
                 rewards = rewards * discount

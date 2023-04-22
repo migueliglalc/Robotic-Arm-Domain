@@ -64,9 +64,11 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
         #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
-        
+        print_parameterized_exprs(planner)
+        """
         for i in params.keys():
             print(f'{i} : {params[i]}')
+        """
         
         total_reward = 0
         state = myEnv.reset()
@@ -266,10 +268,10 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         
         import csv
 
-        weights = [0.001]
+        weights = [1e-0]
         learning_rates = [0.01]
-        epochs = [1000000]
-        horizon = [20]
+        epochs = [1000]
+        horizon = [200]
 
         
         # Open the CSV file for writing
@@ -289,7 +291,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
                             modify_cfg_file('Planner/Arm.cfg', i, j, k, z)
                             step = slp_no_replan(env, trials, timeout, timeout_ps, save, label)
                             # Write the results for this combination to the CSV file
-                            writer.writerow([i, j, k, z, step+1])
+                            #writer.writerow([i, j, k, z, step+1])
         
         #slp_no_replan(env, trials, timeout, timeout_ps, save)
 
@@ -299,7 +301,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Arm', 1, 60 * 100, 1, False
+        env, trials, timeout, timeout_ps, save = 'Wildfire', 1, 6000 * 100000, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)
