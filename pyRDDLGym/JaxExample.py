@@ -8,8 +8,8 @@ from pyRDDLGym.Core.Compiler.RDDLDecompiler import RDDLDecompiler
 import Examples.Arm.animation as animation
 # from pyRDDLGym.Core.Jax.JaxRDDLModelError import JaxRDDLModelError
 
-an_sizes = [(1, 1), (1, 1), (1, 1)]
-shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
+can_sizes = [(1, 1) for i in range(5)]
+shelf_sizes = [(0, 10, 0, 10) for i in range(2)]
 def print_parameterized_exprs(planner):
     model_params = planner.compiled.model_params
     print(f'model_params = {model_params}')
@@ -52,9 +52,6 @@ def slp_train(planner, budget, **train_args):
 
 def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
 
-    can_sizes = [(1, 1), (1, 1), (1, 1)]
-    shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
-
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']
     #print(key)
@@ -64,11 +61,11 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
         #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
-        print_parameterized_exprs(planner)
-        """
+        #print_parameterized_exprs(planner)
+        
         for i in params.keys():
             print(f'{i} : {params[i]}')
-        """
+        
         
         total_reward = 0
         state = myEnv.reset()
@@ -230,7 +227,7 @@ def slp_replan(env, trials, timeout, timeout_ps, save):
         np.savetxt(f'{dom}_{inst}_mpc.csv', rewards, delimiter=',')
 
 
-def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs, horizon):
+def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs, horizon, instance):
     # Read in the original file
     with open(cfg_file_name, 'r') as f:
         file_contents = f.read()
@@ -247,6 +244,9 @@ def modify_cfg_file(cfg_file_name, weight, learning_rate, epochs, horizon):
 
         elif "rollout_horizon" in line:
             lines[i] = f"rollout_horizon = {horizon}"
+
+        elif "instance" in line:
+            lines[i] = f"instance = {instance}"
     
     # Join the lines back together and write the modified file back to disk
     file_contents = '\n'.join(lines)
@@ -269,9 +269,10 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         import csv
 
         weights = [1e-0]
-        learning_rates = [0.01]
-        epochs = [1000]
+        learning_rates = [1]
+        epochs = [5000]
         horizon = [200]
+        instance = 0
 
         
         # Open the CSV file for writing
@@ -288,12 +289,12 @@ def main(env, replan, trials, timeout, timeout_ps, save):
                         for z in horizon:
                             label = f'W:{i}, L:{j}, E:{k}, H:{z}'
                             print(label)
-                            modify_cfg_file('Planner/Arm.cfg', i, j, k, z)
+                            modify_cfg_file('Planner/Arm.cfg', i, j, k, z, instance)
                             step = slp_no_replan(env, trials, timeout, timeout_ps, save, label)
                             # Write the results for this combination to the CSV file
                             #writer.writerow([i, j, k, z, step+1])
         
-        #slp_no_replan(env, trials, timeout, timeout_ps, save)
+        #slp_no_replan(env, trials, timeoPut, timeout_ps, save)
 
 
     
@@ -301,7 +302,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Wildfire', 1, 6000 * 100000, 1, False
+        env, trials, timeout, timeout_ps, save = 'Arm', 1, 6000 * 100000, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

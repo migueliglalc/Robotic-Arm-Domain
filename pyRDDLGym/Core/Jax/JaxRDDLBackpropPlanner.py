@@ -218,9 +218,9 @@ class JaxStraightLinePlan(JaxPlan):
     def __init__(self, initializer: initializers.Initializer=initializers.normal(),
                  wrap_sigmoid: bool=True,
                  min_action_prob: float=0.001,
-                 wrap_non_bool: bool=False,
+                 wrap_non_bool: bool=True,
                  use_new_projection: bool=True,
-                 max_constraint_iter: int=999) -> None:
+                 max_constraint_iter: int=5) -> None:
         '''Creates a new straight line plan in JAX.
         
         :param initializer: a Jax Initializer for setting the initial actions
@@ -243,6 +243,7 @@ class JaxStraightLinePlan(JaxPlan):
         self._min_action_prob = min_action_prob
         self._wrap_non_bool = wrap_non_bool
         self._max_constraint_iter = max_constraint_iter
+        print(max_constraint_iter)
         self._use_new_projection = use_new_projection
         
     def compile(self, compiled: JaxRDDLCompilerWithGrad,

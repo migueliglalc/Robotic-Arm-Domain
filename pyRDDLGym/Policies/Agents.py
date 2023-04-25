@@ -41,14 +41,15 @@ class AdhocAgent(BaseAgent):
     def sample_action(self, state=None):
         actions = []
         actions.append({'extend-to-shelf': 1.0})
-        actions.append({'move_y': 2.5})
-        actions.append({'move_x': 0.75})
-        actions.append({'move_x': -0.75})
-        actions.append({'pick-up___c0__s1': 1.0})
+        #actions.append({'move_y': 2.5})
+        actions.append({'move_x': 1.75})
+        actions.append({'move_y': 2.0})
+        #actions.append({'move_x': -0.75})
+        actions.append({'pick-up___c0': 1.0})
         actions.append({'retract-off-shelf': 1.0})
         actions.append({'change-shelf___s1__s2': 1.0})
         actions.append({'extend-to-shelf': 1.0})
-        actions.append({'put-down___c0__s2': 1.0})
+        actions.append({'put-down___c0': 1.0})
         
         return actions[state]
 

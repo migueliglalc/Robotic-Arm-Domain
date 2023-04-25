@@ -50,18 +50,17 @@ domain can_storage {
     move_y                      : { action-fluent, real, default = 0 };
     retract-off-shelf           : { action-fluent, bool, default = false };
     extend-to-shelf             : { action-fluent, bool, default = false };
-    pick-up(can,shelf)          : { action-fluent, bool, default = false };
-    put-down(can,shelf)         : { action-fluent, bool, default = false };
+    pick-up(can)                : { action-fluent, bool, default = false };
+    put-down(can)               : { action-fluent, bool, default = false };
     change-shelf(shelf,shelf)   : { action-fluent, bool, default = false };
 
   };
 
   cpfs {
 
-    different-can(?c1, ?c2) = if(~(x_position_c(?c1)==x_position_c(?c2) ^ y_position_c(?c1)==y_position_c(?c2))) then true
-                              else false;
+    different-can(?c1, ?c2) = ~(x_position_c(?c1)==x_position_c(?c2) ^ y_position_c(?c1)==y_position_c(?c2));
 
-    break_x(?c, ?s) = if(~(holding(?c))^working-shelf(?s)^on-shelf(?c, ?s)) then //basic
+    break_x(?c, ?s) = if((~holding(?c)|put-down-conditions(?c, ?s)^put-down(?c))^working-shelf(?s)^on-shelf(?c, ?s)) then //basic
                         if(
                             ( //arm crash
                               (
@@ -77,7 +76,7 @@ domain can_storage {
                                   (move_x < 0)
                                 )
                               ) ^
-                              (y_position_a >= y_position_c(?c))
+                              (y_position_a + move_y >= y_position_c(?c))
                             )
                             |
                             (
@@ -97,10 +96,10 @@ domain can_storage {
                                       )
                                     ) ^
                                     (
-                                      (((y_position_c(?c1) + SIZE_Y_c(?c1)) > y_position_c(?c)) ^
-                                      ((y_position_c(?c1) + SIZE_Y_c(?c1)) <= (y_position_c(?c) + SIZE_Y_c(?c)))) |
-                                      ((y_position_c(?c1) < (y_position_c(?c) + SIZE_Y_c(?c))) ^
-                                      (y_position_c(?c1) > y_position_c(?c)))
+                                      (((y_position_c(?c1) + move_y + SIZE_Y_c(?c1)) > y_position_c(?c)) ^
+                                      ((y_position_c(?c1) + move_y + SIZE_Y_c(?c1)) <= (y_position_c(?c) + SIZE_Y_c(?c)))) |
+                                      ((y_position_c(?c1) + move_y < (y_position_c(?c) + SIZE_Y_c(?c))) ^
+                                      (y_position_c(?c1) + move_y > y_position_c(?c)))
                                     )
                                 )]
                             )) then true
@@ -108,18 +107,18 @@ domain can_storage {
                     else false;                    
 
 
-    break-extension(?c, ?s) = if (~holding(?c)^working-shelf(?s)^~safe-position^on-shelf(?c,?s)) then
+    break-extension(?c, ?s) = if ((~holding(?c)|put-down-conditions(?c, ?s)^put-down(?c))^working-shelf(?s)^~safe-position^on-shelf(?c,?s)) then
                                 if(
                                   ( ( (y_position_a + move_y)>y_position_c(?c) )^ //check y
                                     ( 
                                       (
-                                        ( (x_position_a + SIZE_X_a)> x_position_c(?c))^
-                                        ( (x_position_a + SIZE_X_a)< (x_position_c(?c) + SIZE_X_c(?c)) )
+                                        ( (x_position_a + move_x +  SIZE_X_a)> x_position_c(?c))^
+                                        ( (x_position_a + move_x + SIZE_X_a)<= (x_position_c(?c) + SIZE_X_c(?c)) )
                                       )
                                       |
                                       (
-                                        ( x_position_a> x_position_c(?c))^
-                                        ( x_position_a< (x_position_c(?c) + SIZE_X_c(?c)) )
+                                        ( x_position_a + move_x >= x_position_c(?c))^
+                                        ( x_position_a + move_x < (x_position_c(?c) + SIZE_X_c(?c)) )
                                       )
                                     ) //check x
                                   ) //if the arm breaks-extension
@@ -130,13 +129,13 @@ domain can_storage {
                                       ( ( (y_position_c(?c1) + SIZE_Y_c(?c1) + move_y)>y_position_c(?c) )^ //check y
                                         ( 
                                           (
-                                            ( (x_position_c(?c1) + SIZE_X_c(?c1))> x_position_c(?c))^
-                                            ( (x_position_c(?c1) + SIZE_X_c(?c1))< (x_position_c(?c) + SIZE_X_c(?c)) )
+                                            ( (x_position_c(?c1) + move_x + SIZE_X_c(?c1))> x_position_c(?c))^
+                                            ( (x_position_c(?c1) + move_x + SIZE_X_c(?c1))< (x_position_c(?c) + SIZE_X_c(?c)) )
                                           )
                                           |
                                           (
-                                            ( x_position_c(?c1)> x_position_c(?c))^
-                                            ( x_position_c(?c1)< (x_position_c(?c) + SIZE_X_c(?c)) )
+                                            ( x_position_c(?c1) + move_x > x_position_c(?c))^
+                                            ( x_position_c(?c1) + move_x < (x_position_c(?c) + SIZE_X_c(?c)) )
                                           )
                                         ) //check x
                                       )
@@ -147,22 +146,16 @@ domain can_storage {
                               else false;
 
 
-    put-down-conditions(?c,?s) = if([sum_{?s1: shelf, ?c1: can}(put-down(?c1, ?s1))]>1)
-                                    then false
-                                 else 
-                                    (holding(?c) ^ working-shelf(?s) ^~safe-position);
+    put-down-conditions(?c,?s) = (holding(?c) ^ working-shelf(?s) ^~safe-position);
 
 
-    pick-up-conditions(?c, ?s) = if([sum_{?s1: shelf, ?c1: can}(pick-up(?c1, ?s1))]>1)
-                                    then false
-                                  else
-                                  if (arm-free ^ working-shelf(?s) ^ on-shelf(?c, ?s) ^ ~safe-position) then
+    pick-up-conditions(?c, ?s) = if (arm-free ^ working-shelf(?s) ^ on-shelf(?c, ?s) ^ ~safe-position) then
                                       if (
                                           ((x_position_a < x_position_c(?c)) ^ ((x_position_a + SIZE_X_a) > x_position_c(?c)))
                                           | ((x_position_a >= x_position_c(?c)) ^ (x_position_a < (x_position_c(?c) + SIZE_X_c(?c))))
                                       ) then
                                           if (
-                                              ((y_position_c(?c) - y_position_a) < EPSILON)
+                                              ((y_position_c(?c) - y_position_a) < EPSILON ^ (y_position_c(?c) - y_position_a) > 0)
                                               ^ (~[exists_{?c1:can} (
                                                   different-can(?c, ?c1) ^
                                                   (
@@ -184,9 +177,9 @@ domain can_storage {
                                   else false;
 
 
-    holding'(?c) = if ([sum_{?s:shelf}(pick-up-conditions(?c,?s)^pick-up(?c, ?s))]==1)
+    holding'(?c) = if ([exists_{?s:shelf}(pick-up-conditions(?c,?s)^pick-up(?c))])
                       then true
-                    else if ([sum_{?s:shelf}(put-down-conditions(?c,?s)^put-down(?c,?s))]==1)
+                    else if ([exists_{?s:shelf}(put-down-conditions(?c,?s)^put-down(?c))])
                       then false
                     else holding(?c);
 
@@ -195,60 +188,60 @@ domain can_storage {
 
     safe-position = y_position_a==SAFE_POSITION_Y;
 
-    working-shelf'(?s2) = //if([sum_{?s1: shelf, ?s3:shelf} (change-shelf(?s1, ?s3))]>1)
-                            //then working-shelf(?s2)
-
-                          if ([sum_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1,?s2)^safe-position^?s1~=?s2)]==1)
+    working-shelf'(?s2) = if ([exists_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1,?s2)^safe-position^?s1~=?s2)])
                             then true
-                          else if ([sum_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2,?s1)^safe-position^?s1~=?s2)]==1)
+                          else if ([exists_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2,?s1)^safe-position^?s1~=?s2)])
                             then false
                           else working-shelf(?s2);
+                        
                           
-                          on-shelf'(?c, ?s) = 
-                            if (put-down-conditions(?c,?s)^put-down(?c,?s))
-                              then true
-                            else if (pick-up-conditions(?c,?s)^pick-up(?c, ?s))
-                              then false
-                            else on-shelf(?c, ?s);
+    on-shelf'(?c, ?s) = if (put-down-conditions(?c,?s)^put-down(?c))
+                          then true
+                        else if (pick-up-conditions(?c,?s)^pick-up(?c))
+                          then false
+                        else on-shelf(?c, ?s);
 
 
-    x_position_a' = if((move_x~=0.0 + move_y~=0.0)>1) then x_position_a
+    x_position_a' = if ([exists_{?c:can, ?s:shelf}(break_x(?c,?s))]
+                      |
+                      [exists_{?s:shelf}(
+                          working-shelf(?s)
+                          ^ (
+                              (x_position_a + move_x) < MIN_X(?s)
+                              | (x_position_a + SIZE_X_a + move_x) > MAX_X(?s)
+                              | [exists_{?c:can}(
+                                  holding(?c)
+                                  ^ (
+                                      (x_position_c(?c) + move_x) < MIN_X(?s)
+                                      | (x_position_c(?c) + SIZE_X_c(?c) + move_x) > MAX_X(?s)
+                                  )
+                              )]
+                          )
+                      )]
+                  ) then x_position_a
+                  else x_position_a + move_x;
 
-                    else if([exists_{?c:can, ?s:shelf}(break_x(?c,?s))]) 
-                      then x_position_a
-                    else
-                      if (
+
+
+    y_position_a' = if (retract-off-shelf) then SAFE_POSITION_Y
+                    else if(extend-to-shelf ^ safe-position) then 0
+                      else if (
+                          (safe-position ^ ~extend-to-shelf)
+                          |
+                          [exists_{?c:can, ?s:shelf}(break-extension(?c, ?s))]
+                          |
+                          ((y_position_a + move_y) < 0)
+                          |
                           [exists_{?s:shelf}(
-                            working-shelf(?s)^
-                            ( (x_position_a + move_x)<MIN_X(?s) 
-                            | (x_position_a + SIZE_X_a + move_x)>MAX_X(?s) )
-                            |
-                            ([exists_{?c:can}(holding(?c)^( (x_position_c(?c) + move_x)<MIN_X(?s) 
-                            | (x_position_c(?c) + SIZE_X_c(?c) + move_x)>MAX_X(?s) ))])
+                              working-shelf(?s)
+                              ^ (
+                                  (y_position_a + move_y)>MAX_Y(?s)
+                                  |
+                                  [exists_{?c:can}(holding(?c) ^ (y_position_a + SIZE_Y_c(?c) + move_y)>MAX_Y(?s))]
+                              )
                           )]
-                      ) then x_position_a
-                      else
-                        x_position_a + move_x;
-
-
-    y_position_a' = if((move_x~=0.0 + move_y~=0.0)>1) then y_position_a
-            
-                    else if(retract-off-shelf) then SAFE_POSITION_Y //if not safe position
-                    else if (extend-to-shelf) 
-                      then if(safe-position) then 0 //if extend from safe-position -> y=0
-                           else y_position_a
-                    else if ([exists_{?c:can, ?s:shelf}(break-extension(?c, ?s))]) //check break-extension
-                      then y_position_a
-                    else if ((y_position_a + move_y)<0) //check negative retract ->not possible
-                      then y_position_a
-                    else if ([exists_{?c:can,?s:shelf}(holding(?c)^~safe-position^working-shelf(?s)^
-                            (y_position_a + SIZE_Y_c(?c) + move_y)>MAX_Y(?s))]) //check limit when holding can
-                              then y_position_a
-                    else if ([exists_{?s:shelf}(~safe-position^working-shelf(?s)^
-                            (y_position_a + move_y)>MAX_Y(?s))]) //check limit when not holding can
-                              then y_position_a
-                    else if (safe-position) then y_position_a
-                    else y_position_a + move_y;
+                      ) then y_position_a
+                      else y_position_a + move_y;
 
 
     x_position_c'(?c) = if(holding'(?c)^~(x_position_a==x_position_a')) then x_position_c(?c) + move_x else x_position_c(?c);
@@ -256,6 +249,7 @@ domain can_storage {
     };
 
   reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]);
+            //- 0.0*(move_x==0 + move_y==0);
 
   termination{
       [exists_{?s:shelf}([forall_{?c:can}(on-shelf(?c,?s))])];
