@@ -125,5 +125,5 @@ def run_experiment(problem, probname,
 
 
 if __name__ == '__main__':
-    problem, probname = 'BasicArm', 'BasicArm'
+    problem, probname = 'Arm', 'Arm'
     run_experiment(problem, probname)

@@ -62,10 +62,10 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
         train_args['key'] = key
         params = slp_train(planner, timeout, **train_args)
         #print_parameterized_exprs(planner)
-        
+        """
         for i in params.keys():
             print(f'{i} : {params[i]}')
-        
+        """
         
         total_reward = 0
         state = myEnv.reset()

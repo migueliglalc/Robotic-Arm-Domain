@@ -216,16 +216,12 @@ class JaxStraightLinePlan(JaxPlan):
     '''A straight line plan implementation in JAX'''
     
     def __init__(self, initializer: initializers.Initializer=initializers.normal(),
-                 wrap_sigmoid: bool=True,
-                 min_action_prob: float=0.001,
-<<<<<<< HEAD
-                 wrap_non_bool: bool=True,
-=======
-                 wrap_non_bool: bool=False,
-                 wrap_softmax: bool=False,
->>>>>>> f681ddafd83dc1e838a6b1564707fd04b2055452
-                 use_new_projection: bool=True,
-                 max_constraint_iter: int=5) -> None:
+                 wrap_sigmoid: bool = True,
+                 min_action_prob: float = 0.001,
+                 wrap_non_bool: bool = False,
+                 wrap_softmax: bool = False,
+                 use_new_projection: bool = True,
+                 max_constraint_iter: int = 999) -> None:
         '''Creates a new straight line plan in JAX.
         
         :param initializer: a Jax Initializer for setting the initial actions
@@ -251,12 +247,8 @@ class JaxStraightLinePlan(JaxPlan):
         self._wrap_sigmoid = wrap_sigmoid
         self._min_action_prob = min_action_prob
         self._wrap_non_bool = wrap_non_bool
-<<<<<<< HEAD
         self._max_constraint_iter = max_constraint_iter
-        print(max_constraint_iter)
-=======
         self._wrap_softmax = wrap_softmax
->>>>>>> f681ddafd83dc1e838a6b1564707fd04b2055452
         self._use_new_projection = use_new_projection
         self._max_constraint_iter = max_constraint_iter
         
@@ -399,8 +391,7 @@ class JaxStraightLinePlan(JaxPlan):
         
         self.train_policy = _jax_wrapped_slp_predict_train
         self.test_policy = _jax_wrapped_slp_predict_test
-        
-<<<<<<< HEAD
+
         if use_constraint_satisfaction: 
             warnings.warn(f'Using projected gradient trick to satisfy '
                           f'max_nondef_actions: total boolean actions '
@@ -409,12 +400,10 @@ class JaxStraightLinePlan(JaxPlan):
             print(rddl.actions.items())
             noop = {var: (values if isinstance(values, bool) else values)
                     for (var, values) in rddl.actions.items()}
-=======
         # ***********************************************************************
         # ACTION CONSTRAINT SATISFACTION
         #
         # ***********************************************************************
->>>>>>> f681ddafd83dc1e838a6b1564707fd04b2055452
         
         # use a softmax output activation
         if use_constraint_satisfaction and self._wrap_softmax:

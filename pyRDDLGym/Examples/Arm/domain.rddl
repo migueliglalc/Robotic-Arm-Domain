@@ -155,7 +155,7 @@ domain can_storage {
                                           | ((x_position_a >= x_position_c(?c)) ^ (x_position_a < (x_position_c(?c) + SIZE_X_c(?c))))
                                       ) then
                                           if (
-                                              ((y_position_c(?c) - y_position_a) < EPSILON ^ (y_position_c(?c) - y_position_a) > 0)
+                                              ((y_position_c(?c) - y_position_a) < EPSILON ^ (y_position_c(?c) - y_position_a) >= 0)
                                               ^ (~[exists_{?c1:can} (
                                                   different-can(?c, ?c1) ^
                                                   (
@@ -248,7 +248,9 @@ domain can_storage {
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
     };
 
-  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])]);
+  reward = ([exists_{?s:shelf}([forall_{?c:can}(on-shelf'(?c,?s))])])
+            - 0.0*(move_x~=0.0 + move_y~=0.0 + extend-to-shelf + retract-off-shelf + 
+            [exists_{?c:can}(pick-up(?c)|put-down(?c))] + [exists_{?s1: shelf, ?s2: shelf}(change-shelf(?s1, ?s2))]);
             //- 0.0*(move_x==0 + move_y==0);
 
   termination{
