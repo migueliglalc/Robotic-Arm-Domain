@@ -35,6 +35,24 @@ class ProductTNorm(TNorm):
     def norms(self, x, axis):
         return jnp.prod(x, axis=axis)
 
+
+class GodelTNorm(TNorm):
+    
+    def norm(self, x, y):
+        return jnp.minimum(x, y)
+    
+    def norms(self, x, axis):
+        return jnp.min(x, axis=axis)
+
+
+class LukasiewiczTNorm(TNorm):
+    
+    def norm(self, x, y):
+        return jax.nn.relu(x + y - 1.0)
+    
+    def norms(self, x, axis):
+        return jax.nn.relu(jnp.sum(x - 1.0, axis=axis) + 1.0)
+    
     
 class FuzzyLogic:
     '''A class representing fuzzy logic in JAX.
