@@ -1,5 +1,5 @@
  name,description,location,instances,viz
-Arm,Task And Motion Planning Problem; where integer data has been included to define the specific coordinates of the cans on the shelfs; which now is finite and bidimensioanal,/Arm/,0,TextViz.TextVisualizer
+Arm,Task And Motion Planning Problem; where integer data has been included to define the specific coordinates of the cans on the shelfs; which now is finite and bidimensioanal,/Arm/,0,ArmViz.ArmVisualizer
 BasicArm,Task And Motion Planning Problem; where integer data has been included to define the specific coordinates of the cans on the shelfs; which now is finite and bidimensioanal,/BasicArm/,0,TextViz.TextVisualizer
 RaceCar,A simple continuous MDP for the racecar problem.,/RaceCar/,"1,0",RacecarViz.RacecarVisualizer
 Elevators,The Elevator domain models evening rush hours when people from different floors in a building want to go down to the bottom floor using elevators.,/Elevators/,"1,0",ElevatorViz.ElevatorVisualizer

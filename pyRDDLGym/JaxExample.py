@@ -9,7 +9,7 @@ import Examples.Arm.animation as animation
 # from pyRDDLGym.Core.Jax.JaxRDDLModelError import JaxRDDLModelError
 
 can_sizes = [(1, 1) for i in range(5)]
-shelf_sizes = [(0, 10, 0, 10) for i in range(2)]
+shelf_sizes = [(0, 10, 0, 10) for i in range(5)]
 def print_parameterized_exprs(planner):
     model_params = planner.compiled.model_params
     print(f'model_params = {model_params}')
@@ -100,10 +100,11 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
             #animation.parse_state(state,  label, can_sizes, shelf_sizes)
             
             if done:
+                animation.parse_state(state,  step, can_sizes, shelf_sizes)
                 animation.parse_state(state,  label, can_sizes, shelf_sizes)
                 #animation.create_video()
                 break
-        #print(f'episode ended with reward {total_reward}')
+        print(f'episode ended with reward {total_reward}')
         
     myEnv.close()
     if save:
@@ -270,7 +271,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 
         weights = [1e-0]
         learning_rates = [1]
-        epochs = [5000]
+        epochs = [3000]
         horizon = [200]
         instance = 0
 
@@ -302,7 +303,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Arm', 1, 6000 * 100000, 1, False
+        env, trials, timeout, timeout_ps, save = 'Wildfire', 1, 6000 * 100000, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

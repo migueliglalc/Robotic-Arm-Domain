@@ -35,8 +35,8 @@ def main(env, inst, method_name=None, episodes=1):
     agent = AdhocAgent(action_space=myEnv.action_space,
                         num_actions=myEnv.numConcurrentActions)
 
-    can_sizes = [(1, 1), (1, 1), (1, 1)]
-    shelf_sizes = [(0, 10, 0, 10), (0, 10, 0, 10), (0, 10, 0, 10)]
+    can_sizes = [(1, 1) for i in range(4)]
+    shelf_sizes = [(0, 10, 0, 10) for i in range(3)]
 
     for episode in range(episodes):
         total_reward = 0

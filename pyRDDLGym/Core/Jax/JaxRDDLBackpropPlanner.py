@@ -216,10 +216,10 @@ class JaxStraightLinePlan(JaxPlan):
     '''A straight line plan implementation in JAX'''
     
     def __init__(self, initializer: initializers.Initializer=initializers.normal(),
-                 wrap_sigmoid: bool = True,
+                 wrap_sigmoid: bool = None,
                  min_action_prob: float = 0.001,
                  wrap_non_bool: bool = False,
-                 wrap_softmax: bool = False,
+                 wrap_softmax: bool = True,
                  use_new_projection: bool = True,
                  max_constraint_iter: int = 999) -> None:
         '''Creates a new straight line plan in JAX.

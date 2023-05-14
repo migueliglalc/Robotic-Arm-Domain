@@ -160,7 +160,6 @@ class WildfireVisualizer(StateViz):
 
     def render(self, state):
         self.states = state
-
         self._nonfluent_layout = self.build_nonfluents_layout()
         self._state_layout = self.build_states_layout(state)
         self._canvas_info = self.init_canvas_info()
