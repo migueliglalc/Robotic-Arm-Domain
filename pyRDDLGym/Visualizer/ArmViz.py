@@ -96,8 +96,6 @@ class ArmVisualizer(StateViz):
         can_sizes = self._nonfluent_layout['can_sizes']
         shelf_sizes = self._nonfluent_layout['shelf_sizes']
 
-        print(can_on_shelf)
-
         # Clear previous plot
         for ax in self._ax:
             ax.cla()

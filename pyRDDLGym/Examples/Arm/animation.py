@@ -25,7 +25,7 @@ def create_video(resolution=(1008, 512), fps=3):
     images[0].save(video_name, save_all=True, append_images=images[1:], duration=1000/fps, loop=0)
 
 
-def parse_state(state, index,  can_sizes, shelf_sizes):
+def parse_state(state, index,  can_sizes, shelf_sizes, deter):
     # Count number of shelves in state
     num_shelves = sum(['working-shelf___' in key for key in state.keys()])
     # Create subplots
@@ -64,5 +64,5 @@ def parse_state(state, index,  can_sizes, shelf_sizes):
         axs[i].set_ylim([shelf_sizes[i][2]-6, shelf_sizes[i][3]])
 
     # Show plot
-    plt.savefig(f'Examples/Arm/States/{index}.png')
+    plt.savefig(f'Examples/Arm/States/{deter+str(index)}.png')
     plt.close()

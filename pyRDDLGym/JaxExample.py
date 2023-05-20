@@ -70,7 +70,7 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
         total_reward = 0
         state = myEnv.reset()
         for step in range(myEnv.horizon):
-            #myEnv.render()
+            myEnv.render()
 
             subs = myEnv.sampler.subs
             key, subkey = jax.random.split(key)
@@ -84,7 +84,7 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
             rewards[step, trial] = reward
 
             
-            animation.parse_state(state, step, can_sizes, shelf_sizes)
+            animation.parse_state(state, step, can_sizes, shelf_sizes, env[4:8])
             
             print()
             print('step       = {}'.format(step))
@@ -100,8 +100,8 @@ def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
             #animation.parse_state(state,  label, can_sizes, shelf_sizes)
             
             if done:
-                animation.parse_state(state,  step, can_sizes, shelf_sizes)
-                animation.parse_state(state,  label, can_sizes, shelf_sizes)
+                animation.parse_state(state,  step, can_sizes, shelf_sizes, env[4:8])
+                animation.parse_state(state,  label, can_sizes, shelf_sizes, env[4:8])
                 #animation.create_video()
                 break
         print(f'episode ended with reward {total_reward}')
@@ -290,7 +290,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
                         for z in horizon:
                             label = f'W:{i}, L:{j}, E:{k}, H:{z}'
                             print(label)
-                            modify_cfg_file('Planner/Arm.cfg', i, j, k, z, instance)
+                            modify_cfg_file('Planner/Arm Deterministic.cfg', i, j, k, z, instance)
                             step = slp_no_replan(env, trials, timeout, timeout_ps, save, label)
                             # Write the results for this combination to the CSV file
                             #writer.writerow([i, j, k, z, step+1])
@@ -303,7 +303,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Wildfire', 1, 6000 * 100000, 1, False
+        env, trials, timeout, timeout_ps, save = 'Arm Stochastic', 1, 6000 * 100000, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

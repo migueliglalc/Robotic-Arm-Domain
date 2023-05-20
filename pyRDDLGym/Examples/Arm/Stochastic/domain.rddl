@@ -44,6 +44,7 @@ domain can_storage {
     put-down-conditions(can,shelf)     : { interm-fluent, bool};
     pick-up-conditions(can, shelf)     : { interm-fluent, bool};
     different-can(can, can)            : { interm-fluent, bool};  //returns true if both cans are the same
+    distance(can)                      : { interm-fluent, real}; //returns distance to can
 
     // Actions
     //do-move_x                   : { action-fluent, bo:ol, default = false };
@@ -60,6 +61,8 @@ domain can_storage {
 
   cpfs {
     //time' = time+1;
+
+    distance(?c) = (y_position_c(?c) - y_position_a);
 
     different-can(?c1, ?c2) = ~(x_position_c(?c1)==x_position_c(?c2) ^ y_position_c(?c1)==y_position_c(?c2));
 
@@ -154,7 +157,7 @@ domain can_storage {
                                           | ((x_position_a >= x_position_c(?c)) ^ (x_position_a < (x_position_c(?c) + SIZE_X_c(?c))))
                                       ) then
                                           if (
-                                              ((y_position_c(?c) - y_position_a) < EPSILON ^ (y_position_c(?c) - y_position_a) >= 0)
+                                              (distance(?c) < EPSILON ^ distance(?c) >= 0)
                                               ^ (~[exists_{?c1:can} (
                                                   different-can(?c, ?c1) ^
                                                   (
@@ -177,7 +180,7 @@ domain can_storage {
 
 
     holding'(?c) = if ([exists_{?s:shelf}(pick-up-conditions(?c,?s)^pick-up(?c))])
-                      then true
+                      then Bernoulli(1.0 - distance(?c))
                     else if ([exists_{?s:shelf}(put-down-conditions(?c,?s)^put-down(?c))])
                       then false
                     else holding(?c);
@@ -187,12 +190,14 @@ domain can_storage {
 
     safe-position = y_position_a==SAFE_POSITION_Y;
 
-    working-shelf'(?s2) = if ([sum_{?s1: shelf}(change-shelf(?s1, ?s2))]>1) then working-shelf(?s2)
-                          else if ([exists_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1,?s2)^safe-position^ ?s1~=?s2)])
+    working-shelf'(?s2) = if ([exists_{?s1: shelf} (working-shelf(?s1) ^ change-shelf(?s1, ?s2) ^ safe-position ^ ?s1 ~= ?s2)])
                             then true
-                          else if ([exists_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2,?s1)^safe-position^ ?s1~=?s2)])
+                          else if ([exists_{?s1: shelf} (working-shelf(?s2) ^ change-shelf(?s2, ?s1) ^ safe-position ^ ?s1 ~= ?s2)])
+                            then false
+                          else if ([exists_{?s1: shelf} (working-shelf(?s1) ^ ?s1~=?s2)]) 
                             then false
                           else working-shelf(?s2);
+
                         
     on-shelf'(?c, ?s) = if (put-down-conditions(?c,?s)^put-down(?c))
                           then true

@@ -96,6 +96,7 @@ class ExampleManager:
 
     def get_instance(self, num: int):
         instance = f'instance{num}.rddl'
+        print(self.path_to_env + instance)
         if not os.path.exists(self.path_to_env + instance):
             raise RDDLInstanceNotExist(
                 f'instance {instance} does not exist for '

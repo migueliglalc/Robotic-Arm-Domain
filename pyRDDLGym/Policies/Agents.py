@@ -43,7 +43,7 @@ class AdhocAgent(BaseAgent):
         actions.append({'extend-to-shelf': 1.0})
         #actions.append({'move_y': 2.5})
         actions.append({'move_x': 1.75})
-        actions.append({'move_y': 2.0})
+        actions.append({'move_y': 1.9})
         #actions.append({'move_x': -0.75})
         actions.append({'pick-up___c0': 1.0})
         actions.append({'retract-off-shelf': 1.0})
