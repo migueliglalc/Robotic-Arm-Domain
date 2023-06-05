@@ -50,12 +50,19 @@ def slp_train(planner, budget, **train_args):
     return params
 
 
+<<<<<<< HEAD
 def slp_no_replan(env, trials, timeout, timeout_ps, save, label):
 
     myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']
     #print(key)
 
+=======
+def slp_no_replan(env, trials, timeout, timeout_ps, save):
+    myEnv, planner, _, _, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
+    key = train_args['key']    
+    
+>>>>>>> 526624ea78830e6cba3d51417202cb1eb05daa62
     rewards = np.zeros((myEnv.horizon, trials))
     for trial in range(trials):
         #print('\n' + '*' * 30 + '\n' + f'starting trial {trial + 1}\n' + '*' * 30)
@@ -179,7 +186,7 @@ def my_planner(env, trials, timeout, timeout_ps, save):
 
     
 def slp_replan(env, trials, timeout, timeout_ps, save):
-    myEnv, planner, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
+    myEnv, planner, _, _, train_args, (dom, inst) = JaxConfigManager.get(f'{env}.cfg')
     key = train_args['key']
     
     rewards = np.zeros((myEnv.horizon, trials))

@@ -22,6 +22,7 @@ def main(env, inst, method_name=None, episodes=1):
                             debug=False,
                             log=log,
                             simlogname=method_name)
+    myEnv.seed(42)
     
     # set up the environment visualizer
     # frames_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Visualizer', 'Frames')
@@ -30,7 +31,8 @@ def main(env, inst, method_name=None, episodes=1):
     
     # set up an example aget
     agent = RandomAgent(action_space=myEnv.action_space, 
-                        num_actions=myEnv.numConcurrentActions)
+                        num_actions=myEnv.numConcurrentActions,
+                        seed=42)
 
     agent = AdhocAgent(action_space=myEnv.action_space,
                         num_actions=myEnv.numConcurrentActions)
