@@ -22,7 +22,7 @@ class RDDLEnv(gym.Env):
     def __init__(self, domain: str,
                  instance: str=None,
                  enforce_action_constraints: bool=False,
-                 enforce_action_count_non_bool: bool=True,
+                 enforce_action_count_non_bool: bool=False,
                  debug: bool=False,
                  log: bool=False,
                  simlogname: str=None,

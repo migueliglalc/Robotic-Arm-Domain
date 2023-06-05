@@ -270,8 +270,8 @@ def main(env, replan, trials, timeout, timeout_ps, save):
         import csv
 
         weights = [1e-0]
-        learning_rates = [1]
-        epochs = [3000]
+        learning_rates = [0.1]
+        epochs = [50000]
         horizon = [200]
         instance = 0
 
@@ -303,7 +303,7 @@ def main(env, replan, trials, timeout, timeout_ps, save):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         TF_CPP_MIN_LOG_LEVEL = 0
-        env, trials, timeout, timeout_ps, save = 'Arm Stochastic', 1, 6000 * 100000, 1, False
+        env, trials, timeout, timeout_ps, save = 'Arm Deterministic', 1, 6000 * 100000, 1, False
     else:
         env, trials, timeout, timeout_ps, save = sys.argv[1:6]
         trials = int(trials)

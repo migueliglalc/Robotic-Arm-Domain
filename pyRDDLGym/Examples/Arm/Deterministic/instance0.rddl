@@ -24,7 +24,7 @@ instance can_storage_inst_mdp__1 {
 		y_position_c(c2)=7;
 	};
 
-	max-nondef-actions = pos-inf;
+	max-nondef-actions = 1;
    horizon = 20;
 	discount = 1.0;
 }

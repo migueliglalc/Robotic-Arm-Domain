@@ -46,8 +46,8 @@ domain can_storage {
     different-can(can, can)            : { interm-fluent, bool};  //returns true if both cans are the same
 
     // Actions
-    //do-move_x                   : { action-fluent, bo:ol, default = false };
-    //do-move_y                    { action-fluent, bool, default = false };
+    do-move_x                   : { action-fluent, bool, default = false };
+    do-move_y                   : { action-fluent, bool, default = false };
     move_x                      : { action-fluent, real, default = 0 }; //
     move_y                      : { action-fluent, real, default = 0 };
     retract-off-shelf           : { action-fluent, bool, default = false };
@@ -202,7 +202,7 @@ domain can_storage {
                           then false
                         else on-shelf(?c, ?s);
 
-    x_position_a' = //if (do-move_x) then
+    x_position_a' = if (do-move_x) then
                     if ([exists_{?c:can, ?s:shelf}(break_x(?c,?s))] |
                         [exists_{?s:shelf}(
                             working-shelf(?s)
@@ -219,11 +219,11 @@ domain can_storage {
                             )
                         )]
                     ) then x_position_a
-                    else x_position_a + move_x;
-                 //else x_position_a;
+                    else x_position_a + move_x
+                 else x_position_a;
                  
 
-    y_position_a' = //if(do-move_y) then
+    y_position_a' =   if(do-move_y) then
                       if (retract-off-shelf) then SAFE_POSITION_Y
                       else if(extend-to-shelf ^ safe-position) then 0
                       else if (
@@ -242,8 +242,8 @@ domain can_storage {
                                   )
                               )]
                           ) then y_position_a
-                          else y_position_a + move_y;
-                    //else y_position_a;
+                          else y_position_a + move_y
+                    else y_position_a;
 
     x_position_c'(?c) = if(holding'(?c) ^ x_position_a~=x_position_a') then x_position_c(?c) + move_x else x_position_c(?c);
     y_position_c'(?c) = if(holding'(?c)) then y_position_a' else y_position_c(?c);
