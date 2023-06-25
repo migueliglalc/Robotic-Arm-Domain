@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from abc import ABCMeta, abstractmethod
 import random
 
@@ -63,7 +62,6 @@ class NoOpAgent(BaseAgent):
         action = {}
         return action
 
-=======
 from abc import ABCMeta, abstractmethod
 import random
 
@@ -109,5 +107,3 @@ class NoOpAgent(BaseAgent):
     def sample_action(self, state=None):
         action = {}
         return action
-
->>>>>>> 526624ea78830e6cba3d51417202cb1eb05daa62

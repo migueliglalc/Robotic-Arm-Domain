@@ -124,5 +124,5 @@ def run_experiment(problem, probname,
 
 
 if __name__ == '__main__':
-    problem, probname = 'Arm', 'Arm'
+    problem, probname = 'Arm Deterministic', 'Arm Deterministic'
     run_experiment(problem, probname)

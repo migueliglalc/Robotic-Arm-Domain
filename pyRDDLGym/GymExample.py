@@ -72,7 +72,7 @@ if __name__ == "__main__":
     method_name = None
     episodes = 1
     if len(args) < 3:
-        env, inst = 'Arm Stochastic', '0'
+        env, inst = 'Arm Deterministic', '0'
     elif len(args) < 4:
         env, inst = args[1:3]
     elif len(args) < 5:

@@ -16,16 +16,16 @@ from pyRDDLGym.Examples.ExampleManager import ExampleManager
 def load_config_file(path: str):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
     config = configparser.RawConfigParser()
-    config.optionxform = str 
+    config.optionxform = str
     config.read(path)
-    args = {k: literal_eval(v) 
+    args = {k: literal_eval(v)
             for section in config.sections()
             for (k, v) in config.items(section)}
     return config, args
 
 
 def read_config_sections(config, args):
-    env_args = {k: args[k] for (k, _) in config.items('Environment')} 
+    env_args = {k: args[k] for (k, _) in config.items('Environment')}
     model_args = {k: args[k] for (k, _) in config.items('Model')}
     planner_args = {k: args[k] for (k, _) in config.items('Optimizer')}
     train_args = {k: args[k] for (k, _) in config.items('Training')}
@@ -33,7 +33,7 @@ def read_config_sections(config, args):
 
 
 def load_rddl_files(check_external, domain_name, inst_name):
-    try: 
+    try:
         # try to read from external rddlrepository  
         if not check_external:
             raise Exception
@@ -41,24 +41,23 @@ def load_rddl_files(check_external, domain_name, inst_name):
         from rddlrepository.Manager.RDDLRepoManager import RDDLRepoManager
         manager = RDDLRepoManager()
         EnvInfo = manager.get_problem(domain_name)
-    except: 
+    except:
         # default to embedded RDDL manager
         warnings.warn(f'failed to read from rddlrepository, '
                       f'reading {domain_name} from Examples...', stacklevel=2)
-        EnvInfo = ExampleManager.GetEnvInfo(domain_name)        
+        EnvInfo = ExampleManager.GetEnvInfo(domain_name)
     domain = EnvInfo.get_domain()
     instance = EnvInfo.get_instance(inst_name)
     return domain, instance
 
 
-def get(path: str, 
-        new_env_kwargs={}, new_logic_kwargs={}, 
+def get(path: str,
+        new_env_kwargs={}, new_logic_kwargs={},
         new_plan_kwargs={}, new_planner_kwargs={}) -> Dict[str, object]:
-    
     # load the config file
     config, args = load_config_file(path)
     env_args, model_args, planner_args, train_args = read_config_sections(config, args)
-    
+
     # read the environment settings
     check_external = env_args.pop('check_rddlrepository', False)
     domain_name = env_args['domain']
@@ -67,12 +66,8 @@ def get(path: str,
         check_external, domain_name, inst_name)
     env_args.update(new_env_kwargs)
     myEnv = RDDLEnv(**env_args)
-<<<<<<< HEAD
-    myEnv.set_visualizer(EnvInfo.get_visualizer())
-=======
     planner_args['rddl'] = myEnv.model
->>>>>>> 526624ea78830e6cba3d51417202cb1eb05daa62
-    
+
     # read the model settings
     tnorm_name = model_args['tnorm']
     tnorm_kwargs = model_args['tnorm_kwargs']
@@ -81,34 +76,33 @@ def get(path: str,
     logic_kwargs['tnorm'] = getattr(JaxRDDLLogic, tnorm_name)(**tnorm_kwargs)
     logic_kwargs.update(new_logic_kwargs)
     planner_args['logic'] = getattr(JaxRDDLLogic, logic_name)(**logic_kwargs)
-    
+
     # read the optimizer settings
     plan_method = planner_args.pop('method')
-    plan_kwargs = planner_args.pop('method_kwargs', {})  
-    
+    plan_kwargs = planner_args.pop('method_kwargs', {})
+
     if 'initializer' in plan_kwargs:  # weight initialization
         init_name = plan_kwargs['initializer']
         init_class = getattr(initializers, init_name)
         init_kwargs = plan_kwargs.pop('initializer_kwargs', {})
-        try: 
+        try:
             plan_kwargs['initializer'] = init_class(**init_kwargs)
         except:
             warnings.warn(f'ignoring arguments for initializer <{init_name}>',
                           stacklevel=2)
             plan_kwargs['initializer'] = init_class
-               
+
     if 'activation' in plan_kwargs:  # activation function
         plan_kwargs['activation'] = getattr(jax.nn, plan_kwargs['activation'])
-    
+
     plan_kwargs.update(new_plan_kwargs)
     planner_args['plan'] = getattr(JaxRDDLBackpropPlanner, plan_method)(**plan_kwargs)
     planner_args['optimizer'] = getattr(optax, planner_args['optimizer'])
     planner_args.update(new_planner_kwargs)
     planner = JaxRDDLBackpropPlanner.JaxRDDLBackpropPlanner(**planner_args)
-    
+
     # read the training settings
     train_args['key'] = jax.random.PRNGKey(train_args['key'])
-    
+
     return myEnv, planner, planner_args, plan_kwargs, train_args, \
         (domain_name, inst_name)
-    
